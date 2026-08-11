@@ -1,0 +1,22 @@
+# Node dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# VS Code Extension packaging output
+*.vsix
+
+# VS Code test and coverage runs
+.vscode-test/
+out/
+coverage/
+.vscode/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
