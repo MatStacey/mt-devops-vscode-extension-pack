@@ -15,10 +15,6 @@
   "categories": [
     "Extension Packs"
   ],
-  "files": [
-    "README.md",
-    "LICENSE"
-  ],
   "extensionPack": [
     "anthropic.claude-code",
     "atlassian.atlascode",
