@@ -39,7 +39,7 @@ jobs:
         run: |
           # Strip the 'v' prefix for npm version to strictly bump package.json
           RAW_VERSION="${{ steps.tag_version.outputs.new_version }}"
-          npm version "$RAW_VERSION" --no-git-tag-version
+          npm version "$RAW_VERSION" --allow-same-version --no-git-tag-version
 
       - name: Package VSIX
         run: |
