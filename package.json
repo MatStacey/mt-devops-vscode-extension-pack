@@ -1,12 +1,12 @@
 {
-  "name": "vscode-ext-pack",
-  "displayName": "VSCode Extensions",
-  "description": "A standardized VSCode environment",
+  "name": "mt-devops-vscode-extension-pack",
+  "displayName": "MT DevOps Framework VSCode Extension Pack",
+  "description": "A VSCode environment to compliment the MT DevOps Framework",
   "version": "0.0.2",
   "publisher": "MatStacey",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MatStacey/vscode-ext-pack"
+    "url": "https://github.com/MatStacey/mt-devops-vscode-extension-pack"
   },
   "license": "MIT",
   "engines": {
