@@ -1,8 +1,18 @@
-# VSCode Extension Pack
+# MT DevOps VSCode Extension Pack
 
-This Extension Pack contains a curated list of Visual Studio Code extensions to standardize development environments. Installing this pack will automatically install all the extensions listed below, ensuring everyone has the same tooling, formatting, and language support.
+This Extension Pack contains a strictly curated list of Visual Studio Code extensions designed to seamlessly integrate with the **MT DevOps Framework**. Installing this pack ensures a standardized environment with consistent tooling, linting, and infrastructure-as-code integrations.
 
-## Prerequisites
+## 📦 Included Extensions
+
+* **AI Assistants:** Google Gemini Code Assist, Anthropic Claude Code
+* **Infrastructure & Cloud:** HashiCorp Terraform, Bridgecrew Checkov, Docker, GCP IAM Completions
+* **Linting & Formatting:** ShellCheck, shell-format, Ruff (Python), YAML, Even Better TOML
+* **Languages:** Python, Pylance
+* **Version Control:** GitBlame, .gitignore
+* **Environment:** WSL, Dev Containers
+* **Utilities:** Markdown All in One, Atlassian Atlascode
+
+## 📋 Prerequisites
 
 Before installing this extension pack, ensure you have the following installed:
 
@@ -10,21 +20,19 @@ Before installing this extension pack, ensure you have the following installed:
 
 ### Windows 
 * **Docker Desktop:** Download the latest version from the [official website](https://docs.docker.com/desktop/setup/install/windows-install/).
-  * Requires Virtualization (hyper-v) enabled BIOS
+  * Requires Virtualization (Hyper-V) enabled in BIOS.
   
 ### WSL  
+* **WSL (Windows Subsystem for Linux):** Configured with a Debian/Ubuntu distribution.
+* **WSL Extension:** The official `ms-vscode-remote.remote-wsl` extension installed in VS Code to enable connecting to your environment.
 
-* **WSL (Windows Subsystem for Linux):** Configured with a Debian distribution.
-* **WSL Extension:** The official `ms-vscode-remote.remote-wsl` extension installed in VS Code to enable connecting to your Debian environment.
+## 🚀 How to Install
 
-## How to Install
-
-1. Open Visual Studio Code.
-2. [WSL] Connect to your WSL: Debian environment using the Remote Explorer.
-3. Navigate to the **Extensions** view (`Ctrl+Shift+X` or `Cmd+Shift+X`).
-4. Click the `...` (Views and More Actions) menu in the top right of the Extensions panel.
-5. Select **Install from VSIX...**
-6. Locate and select the downloaded `.vsix` file.
-7. Reload VS Code when prompted. All extensions in the pack will be installed automatically into your WSL environment.
-
----
+1. Download the latest `.vsix` release artifact from this repository's **Releases** page.
+2. Open Visual Studio Code.
+3. **[WSL Only]** Connect to your WSL environment using the Remote Explorer.
+4. Navigate to the **Extensions** view (`Ctrl+Shift+X` or `Cmd+Shift+X`).
+5. Click the `...` (Views and More Actions) menu in the top right of the Extensions panel.
+6. Select **Install from VSIX...**
+7. Locate and select the downloaded `.vsix` file.
+8. Reload VS Code when prompted. All extensions in the pack will automatically initialize.
