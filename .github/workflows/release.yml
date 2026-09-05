@@ -35,17 +35,19 @@ jobs:
           default_bump: patch
           tag_prefix: v
 
-      - name: Update package.json version
+      - name: Update package.json versions and package VSIXes
         run: |
           # Strip the 'v' prefix for npm version to strictly bump package.json
           RAW_VERSION="${{ steps.tag_version.outputs.new_version }}"
-          npm version "$RAW_VERSION" --allow-same-version --no-git-tag-version
-
-      - name: Package VSIX
-        run: |
-          npx @vscode/vsce package
-          VSIX_FILE=$(ls *.vsix | head -n 1)
-          echo "VSIX_FILE=$VSIX_FILE" >> $GITHUB_ENV
+          mkdir -p release
+          for pkg_dir in packages/*/; do
+            (
+              cd "$pkg_dir"
+              npm version "$RAW_VERSION" --allow-same-version --no-git-tag-version
+              npx @vscode/vsce package -o "../../release/"
+            )
+          done
+          echo "VSIX_FILES=release/*.vsix" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
@@ -57,6 +59,6 @@ jobs:
 
             ${{ steps.tag_version.outputs.changelog }}
           generate_release_notes: true
-          files: ${{ env.VSIX_FILE }}
+          files: ${{ env.VSIX_FILES }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

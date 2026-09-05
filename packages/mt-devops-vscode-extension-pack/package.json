@@ -1,0 +1,44 @@
+{
+  "name": "mt-devops-vscode-extension-pack",
+  "displayName": "MT DevOps Framework VSCode Extension Pack",
+  "description": "A VSCode environment to compliment the MT DevOps Framework",
+  "version": "0.0.2",
+  "publisher": "MatStacey",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MatStacey/mt-devops-vscode-extension-pack",
+    "directory": "packages/mt-devops-vscode-extension-pack"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Extension Packs"
+  ],
+  "extensionPack": [
+    "anthropic.claude-code",
+    "atlassian.atlascode",
+    "Bridgecrew.checkov",
+    "charliermarsh.ruff",
+    "checkmarx.ast-results",
+    "codezombiech.gitignore",
+    "foxundermoon.shell-format",
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "google.geminicodeassist",
+    "hashicorp.terraform",
+    "ms-azuretools.vscode-containers",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-vscode-remote.remote-containers",
+    "ms-vscode-remote.remote-wsl",
+    "patrickdoc.gcp-iam-completions",
+    "redhat.vscode-yaml",
+    "sonarsource.sonarlint-vscode",
+    "tamasfe.even-better-toml",
+    "timonwong.shellcheck",
+    "waderyan.gitblame",
+    "yzhang.markdown-all-in-one"
+  ]
+}
