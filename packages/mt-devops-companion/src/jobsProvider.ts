@@ -57,9 +57,13 @@ function formatDuration(job: Job): string {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
-class JobTreeItem extends vscode.TreeItem {
+export class JobTreeItem extends vscode.TreeItem {
+  /** The job's ID (first TSV field) -- what mt-jobs --restart/--stop/--remove target. */
+  readonly jobId: string;
+
   constructor(job: Job) {
     super(job.name, vscode.TreeItemCollapsibleState.None);
+    this.jobId = job.id;
     this.description = `${job.status} · ${formatDuration(job)}`;
     this.iconPath = STATUS_ICONS[job.status] ?? new vscode.ThemeIcon("question");
     this.tooltip = new vscode.MarkdownString(
@@ -77,7 +81,11 @@ class JobTreeItem extends vscode.TreeItem {
         arguments: [vscode.Uri.file(job.logFile)],
       };
     }
-    this.contextValue = "mtDevopsJob";
+    // Suffixed with "-running"/"-finished" so package.json's
+    // view/item/context menu only offers "Stop" on a job that's still
+    // actually running, matching mt-jobs --stop's own no-op-with-a-message
+    // guard for a non-running job.
+    this.contextValue = job.status === "RUNNING" ? "mtDevopsJob-running" : "mtDevopsJob-finished";
   }
 }
 
