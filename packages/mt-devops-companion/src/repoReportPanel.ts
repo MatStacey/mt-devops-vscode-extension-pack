@@ -1,12 +1,36 @@
 import { execFile } from "node:child_process";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
 import * as path from "node:path";
+import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
+import { runInTerminal, shellQuote } from "./framework";
 import type { RepoMeta } from "./repoHubProvider";
 
 interface CommitEntry {
   hash: string;
   subject: string;
   relativeDate: string;
+}
+
+interface RemoteInfo {
+  /** e.g. "https://github.com/MatStacey/mt-devops-framework" -- always without a trailing slash or ".git". */
+  webUrl: string;
+  /** e.g. "https://github.com/MatStacey/mt-devops-framework/commit/" -- append a hash directly. */
+  commitUrlBase: string;
+}
+
+interface BranchInfo {
+  name: string;
+  hasLocal: boolean;
+}
+
+interface ReportData {
+  commits: CommitEntry[];
+  remote: RemoteInfo | null;
+  branches: BranchInfo[];
+  behindCount: number;
+  readmeHtml: string | null;
 }
 
 /** Reads the 5 most recent commits via a plain, read-only `git log` -- not framework policy, just a local git query, same as __mt_hub_preview's own bash equivalent. */
@@ -34,6 +58,164 @@ function readRecentCommits(repoPath: string): Promise<CommitEntry[]> {
   });
 }
 
+function runGit(repoPath: string, args: string[]): Promise<string> {
+  return new Promise((resolve) => {
+    execFile("git", ["-C", repoPath, ...args], { maxBuffer: 1024 * 1024 }, (error, stdout) => {
+      resolve(error ? "" : stdout.trim());
+    });
+  });
+}
+
+/** Runs a git command that mutates repo state (pull/fetch); resolves with stderr (or the error message) on failure, "" on success. */
+function execGit(repoPath: string, args: string[]): Promise<string> {
+  return new Promise((resolve) => {
+    execFile("git", ["-C", repoPath, ...args], { maxBuffer: 1024 * 1024 }, (error, _stdout, stderr) => {
+      resolve(error ? stderr.trim() || error.message : "");
+    });
+  });
+}
+
+/**
+ * Parses `git remote get-url origin` into a browsable web URL and a
+ * commit-permalink base, covering both SSH (`git@host:owner/repo.git`)
+ * and HTTPS (`https://host/owner/repo.git`) remote forms. Bitbucket
+ * Cloud uses `/commits/<hash>` (plural) while GitHub/GitLab use
+ * `/commit/<hash>` (singular) -- everything else falls back to the
+ * GitHub-style singular form, which also happens to be self-hosted
+ * GitLab/Gitea's convention.
+ */
+function parseRemoteUrl(remoteUrl: string): RemoteInfo | null {
+  const trimmed = remoteUrl.trim();
+  if (!trimmed) return null;
+
+  let host: string;
+  let repoPath: string;
+
+  const sshMatch = trimmed.match(/^(?:ssh:\/\/)?git@([^:/]+)[:/](.+)$/);
+  const httpMatch = trimmed.match(/^https?:\/\/(?:[^@/]+@)?([^/]+)\/(.+)$/);
+
+  if (sshMatch) {
+    [, host, repoPath] = sshMatch;
+  } else if (httpMatch) {
+    [, host, repoPath] = httpMatch;
+  } else {
+    return null;
+  }
+
+  repoPath = repoPath.replace(/\.git$/, "").replace(/\/+$/, "");
+  const webUrl = `https://${host}/${repoPath}`;
+  const commitSegment = host === "bitbucket.org" ? "commits" : "commit";
+  return { webUrl, commitUrlBase: `${webUrl}/${commitSegment}/` };
+}
+
+/** Local branch names, via `git branch --format`, not the interactive picker used elsewhere. */
+async function readLocalBranches(repoPath: string): Promise<Set<string>> {
+  const output = await runGit(repoPath, ["branch", "--format=%(refname:short)"]);
+  return new Set(output ? output.split("\n") : []);
+}
+
+/**
+ * Whether a branch name is safe to pass as a git refspec argument --
+ * rejects anything starting with "-" (which git/getopt would otherwise
+ * parse as a flag, e.g. a branch named "--upload-pack=..." smuggling
+ * arbitrary command execution into `git fetch`) plus whitespace,
+ * shell/refspec metacharacters, and other control characters. This is
+ * intentionally conservative (real git branch names are already far
+ * more permissive) since the only cost of a false rejection here is
+ * refusing to fetch, not a security gap.
+ */
+function isSafeBranchName(name: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9/_.-]*$/.test(name);
+}
+
+/** Remote-tracking branch names under origin/, with the "origin/" prefix stripped and origin/HEAD excluded. */
+async function readRemoteBranches(repoPath: string): Promise<string[]> {
+  const output = await runGit(repoPath, ["branch", "-r", "--format=%(refname:short)"]);
+  if (!output) return [];
+  return output
+    .split("\n")
+    .map((line) => line.replace(/^origin\//, ""))
+    .filter((name) => name && name !== "HEAD" && isSafeBranchName(name));
+}
+
+/** How many commits the current branch is behind its upstream, or 0 if there's no upstream (e.g. a detached HEAD or a branch never pushed). */
+async function readBehindCount(repoPath: string): Promise<number> {
+  const output = await runGit(repoPath, ["rev-list", "--count", "HEAD..@{u}"]);
+  const count = Number(output);
+  return Number.isFinite(count) ? count : 0;
+}
+
+function findReadme(repoPath: string): string | null {
+  const candidates = fs.existsSync(repoPath) ? fs.readdirSync(repoPath) : [];
+  const readme = candidates.find((name) => /^readme(\.md|\.markdown|\.txt)?$/i.test(name));
+  return readme ? path.join(repoPath, readme) : null;
+}
+
+/** Only these URL schemes (plus scheme-relative/relative paths) are allowed in a README's rendered links/images; anything else (e.g. "javascript:") is replaced with "#" rather than passed through. */
+function sanitizeHref(href: string): string {
+  if (/^(https?:|mailto:)/i.test(href)) return href;
+  if (/^[/#.]/.test(href)) return href;
+  return "#";
+}
+
+/**
+ * A `marked` renderer that closes the two XSS routes raw README content
+ * could otherwise open in this webview: raw HTML passthrough (marked's
+ * default `html` renderer emits it completely unescaped) is instead
+ * escaped to literal text, and link/image URLs are restricted to a
+ * scheme allowlist so a `[x](javascript:...)` link can't execute script
+ * when clicked. The CSP's `script-src 'nonce-...'` already blocks a
+ * plain injected `<script>` tag, but neither event-handler attributes
+ * nor `javascript:` URIs are reliably covered by CSP the same way, so
+ * this is the actual enforcement point for those.
+ */
+const safeRenderer = new Renderer();
+safeRenderer.html = ({ text }) => escapeHtml(text);
+// `function` (not an arrow) so marked's own call-site binds `this` to the
+// renderer instance, giving access to `this.parser.parseInline` the same
+// way the default link renderer does -- an arrow function here would
+// silently lose that binding.
+safeRenderer.link = function (this: Renderer, { href, title, tokens }) {
+  const text = this.parser.parseInline(tokens);
+  const safeHref = sanitizeHref(href);
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<a href="${escapeHtml(safeHref)}"${titleAttr}>${text}</a>`;
+};
+safeRenderer.image = ({ href, title, text }) => {
+  const safeHref = sanitizeHref(href);
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<img src="${escapeHtml(safeHref)}" alt="${escapeHtml(text)}"${titleAttr}>`;
+};
+
+async function renderReadme(repoPath: string): Promise<string | null> {
+  const readmePath = findReadme(repoPath);
+  if (!readmePath) return null;
+  try {
+    const raw = await fs.promises.readFile(readmePath, "utf8");
+    return path.extname(readmePath).toLowerCase() === ".txt"
+      ? `<pre>${escapeHtml(raw)}</pre>`
+      : await marked.parse(raw, { renderer: safeRenderer });
+  } catch {
+    return null;
+  }
+}
+
+async function collectReportData(repoPath: string): Promise<ReportData> {
+  const remoteUrl = await runGit(repoPath, ["remote", "get-url", "origin"]);
+  const remote = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
+
+  const [commits, localBranches, remoteBranchNames, behindCount, readmeHtml] = await Promise.all([
+    readRecentCommits(repoPath),
+    readLocalBranches(repoPath),
+    readRemoteBranches(repoPath),
+    readBehindCount(repoPath),
+    renderReadme(repoPath),
+  ]);
+
+  const branches = remoteBranchNames.map((name) => ({ name, hasLocal: localBranches.has(name) }));
+  return { commits, remote, branches, behindCount, readmeHtml };
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -47,19 +229,47 @@ function metaRow(label: string, value: string): string {
   return `<tr><td class="label">${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`;
 }
 
-function buildHtml(repoPath: string, meta: RepoMeta, commits: CommitEntry[], nonce: string): string {
-  const commitsHtml = commits.length
-    ? commits
-        .map(
-          (c) =>
-            `<li><code>${escapeHtml(c.hash)}</code> ${escapeHtml(c.subject)} <span class="dim">(${escapeHtml(c.relativeDate)})</span></li>`,
-        )
-        .join("")
-    : "<li class='dim'>No commits yet.</li>";
+function buildCommitsHtml(commits: CommitEntry[], remote: RemoteInfo | null): string {
+  if (!commits.length) return "<li class='dim'>No commits yet.</li>";
+  return commits
+    .map((c) => {
+      const hashHtml = remote
+        ? `<a href="${escapeHtml(remote.commitUrlBase + c.hash)}">${escapeHtml(c.hash)}</a>`
+        : escapeHtml(c.hash);
+      return `<li><code>${hashHtml}</code> ${escapeHtml(c.subject)} <span class="dim">(${escapeHtml(c.relativeDate)})</span></li>`;
+    })
+    .join("");
+}
 
+function buildBranchesHtml(branches: BranchInfo[]): string {
+  if (!branches.length) return "<li class='dim'>No remote branches found.</li>";
+  return branches
+    .map((b) => {
+      const action = b.hasLocal
+        ? `<span class="dim">Already local</span>`
+        : `<button class="fetchBtn" data-branch="${escapeHtml(b.name)}">Fetch</button>`;
+      return `<li><code>${escapeHtml(b.name)}</code> ${action}</li>`;
+    })
+    .join("");
+}
+
+function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: string): string {
   const lastIndexed = meta.last_indexed
     ? new Date(meta.last_indexed * 1000).toLocaleString()
     : "Never (run Index This Repo)";
+
+  const browserButton = data.remote
+    ? `<button id="openBrowserBtn">Open in Browser</button>`
+    : `<span class="dim">No recognized remote (add a GitHub/Bitbucket "origin" to enable)</span>`;
+
+  const pullButton =
+    data.behindCount > 0
+      ? `<button id="pullBtn">Update (Pull ${data.behindCount} commit${data.behindCount === 1 ? "" : "s"})</button>`
+      : "";
+
+  const readmeSection = data.readmeHtml
+    ? `<h2>README</h2><div class="readme">${data.readmeHtml}</div>`
+    : "";
 
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -78,13 +288,19 @@ function buildHtml(repoPath: string, meta: RepoMeta, commits: CommitEntry[], non
   ul { padding-left: 18px; }
   li { margin: 4px 0; }
   code { background: var(--vscode-textCodeBlock-background); padding: 1px 5px; border-radius: 3px; }
+  a { color: var(--vscode-textLink-foreground); }
   .dim { color: var(--vscode-descriptionForeground); }
-  button {
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+  .readme { border-top: 1px solid var(--vscode-panel-border); padding-top: 12px; max-width: 900px; }
+  .readme img { max-width: 100%; }
+  .readme pre { background: var(--vscode-textCodeBlock-background); padding: 10px; overflow-x: auto; }
+  button, .fetchBtn {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
-    border: none; padding: 8px 16px; border-radius: 2px; cursor: pointer; font-size: 0.95em; margin-top: 20px;
+    border: none; padding: 6px 14px; border-radius: 2px; cursor: pointer; font-size: 0.95em;
   }
-  button:hover { background: var(--vscode-button-hoverBackground); }
+  button:hover, .fetchBtn:hover { background: var(--vscode-button-hoverBackground); }
+  #openBtn { margin-top: 0; }
 </style>
 </head>
 <body>
@@ -103,45 +319,84 @@ function buildHtml(repoPath: string, meta: RepoMeta, commits: CommitEntry[], non
   </table>
 
   <h2>Recent Commits</h2>
-  <ul>${commitsHtml}</ul>
+  <ul>${buildCommitsHtml(data.commits, data.remote)}</ul>
 
-  <button id="openBtn">Open in VS Code</button>
+  <h2>Remote Branches</h2>
+  <ul>${buildBranchesHtml(data.branches)}</ul>
+
+  <div class="actions">
+    <button id="openBtn">Open in VS Code</button>
+    ${browserButton}
+    ${pullButton}
+    <button id="updateIndexBtn">Update Index (fill gaps only)</button>
+  </div>
+
+  ${readmeSection}
 
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     document.getElementById("openBtn").addEventListener("click", () => {
       vscode.postMessage({ command: "openInVSCode" });
     });
+    const openBrowserBtn = document.getElementById("openBrowserBtn");
+    if (openBrowserBtn) {
+      openBrowserBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "openInBrowser" });
+      });
+    }
+    const pullBtn = document.getElementById("pullBtn");
+    if (pullBtn) {
+      pullBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "pullRepo" });
+      });
+    }
+    document.querySelectorAll(".fetchBtn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        vscode.postMessage({ command: "fetchBranch", branch: btn.getAttribute("data-branch") });
+      });
+    });
+    document.getElementById("updateIndexBtn").addEventListener("click", () => {
+      vscode.postMessage({ command: "updateIndex" });
+    });
   </script>
 </body>
 </html>`;
 }
 
+/** A CSP nonce must be unpredictable to an attacker able to inject markup (e.g. via a crafted README) -- Math.random() is not cryptographically secure and was the actual weakness here, so this uses Node's CSPRNG instead. */
 function getNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return crypto.randomBytes(24).toString("base64");
 }
 
 let activePanel: vscode.WebviewPanel | undefined;
-// The repo path the *currently displayed* report is for -- read by the
+// The repo path/meta the *currently displayed* report is for -- read by the
 // message handler at click time rather than captured per-call, since the
 // panel (and its onDidReceiveMessage subscription) is created only once
-// and reused across every repo the user clicks through. Capturing
-// `repoPath` in a per-call listener instead would stack up one handler
-// per repo viewed, each still firing for its own now-stale path, so
-// clicking "Open in VS Code" after viewing 3 repos would open all 3.
+// and reused across every repo the user clicks through. Capturing these
+// in a per-call listener instead would stack up one handler per repo
+// viewed, each still firing for its own now-stale path, so clicking a
+// button after viewing 3 repos would act on all 3.
 let displayedRepoPath = "";
+let displayedMeta: RepoMeta = {};
+
+async function refreshPanel(): Promise<void> {
+  if (!activePanel) return;
+  const data = await collectReportData(displayedRepoPath);
+  activePanel.webview.html = buildHtml(displayedRepoPath, displayedMeta, data, getNonce());
+}
 
 /**
  * Shows (or reuses, if already open) a single report panel for a repo's
- * cached mt-hub metadata plus its recent commit history. Reused across
- * clicks rather than opening a new tab per repo, matching how the
- * extension already reuses one terminal for framework commands.
+ * cached mt-hub metadata plus its recent commit history, remote branch
+ * list, and rendered README. Reused across clicks rather than opening a
+ * new tab per repo, matching how the extension already reuses one
+ * terminal for framework commands.
  */
 export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<void> {
-  const commits = await readRecentCommits(repoPath);
+  const data = await collectReportData(repoPath);
   const nonce = getNonce();
   displayedRepoPath = repoPath;
+  displayedMeta = meta;
 
   if (!activePanel) {
     activePanel = vscode.window.createWebviewPanel("mtDevopsRepoReport", "Repo Report", vscode.ViewColumn.Active, {
@@ -151,16 +406,55 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
     activePanel.onDidDispose(() => {
       activePanel = undefined;
     });
-    activePanel.webview.onDidReceiveMessage((message: { command: string }) => {
-      if (message.command === "openInVSCode") {
-        vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(displayedRepoPath), {
-          forceNewWindow: true,
-        });
-      }
-    });
+    activePanel.webview.onDidReceiveMessage(
+      async (message: { command: string; branch?: string }) => {
+        if (message.command === "openInVSCode") {
+          vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(displayedRepoPath), {
+            forceNewWindow: true,
+          });
+          return;
+        }
+        if (message.command === "updateIndex") {
+          // Gap-fill indexing calls the AI provider and can take a while,
+          // and the Repo Hub tree already watches .vcs_hub.json and will
+          // refresh itself once mt-hub rewrites it -- same reasoning as
+          // the equivalent right-click actions, so this runs visibly in
+          // the terminal rather than captured.
+          runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(displayedRepoPath))}`);
+          return;
+        }
+        if (message.command === "openInBrowser") {
+          const remoteUrl = await runGit(displayedRepoPath, ["remote", "get-url", "origin"]);
+          const remote = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
+          if (remote) vscode.env.openExternal(vscode.Uri.parse(remote.webUrl));
+          return;
+        }
+        if (message.command === "pullRepo") {
+          const stderr = await execGit(displayedRepoPath, ["pull"]);
+          if (stderr) vscode.window.showErrorMessage(`MT DevOps: git pull failed -- ${stderr}`);
+          await refreshPanel();
+          return;
+        }
+        if (message.command === "fetchBranch" && message.branch) {
+          const branch = message.branch;
+          if (!isSafeBranchName(branch)) {
+            vscode.window.showErrorMessage(`MT DevOps: refusing to fetch unsafe branch name "${branch}".`);
+            return;
+          }
+          // The trailing "--" stops git from treating a refspec that
+          // happens to start with "-" (e.g. a maliciously named remote
+          // branch like "--upload-pack=...") as an option instead of a
+          // positional argument -- isSafeBranchName rejects a leading
+          // "-" too, so this is defense in depth, not the only guard.
+          const stderr = await execGit(displayedRepoPath, ["fetch", "origin", "--", `${branch}:${branch}`]);
+          if (stderr) vscode.window.showErrorMessage(`MT DevOps: fetch failed -- ${stderr}`);
+          await refreshPanel();
+        }
+      },
+    );
   }
 
   activePanel.title = path.basename(repoPath);
-  activePanel.webview.html = buildHtml(repoPath, meta, commits, nonce);
+  activePanel.webview.html = buildHtml(repoPath, meta, data, nonce);
   activePanel.reveal(vscode.ViewColumn.Active);
 }

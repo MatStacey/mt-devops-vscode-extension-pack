@@ -1,16 +1,18 @@
-import * as fs from "node:fs";
-import * as yaml from "js-yaml";
 import * as vscode from "vscode";
+import { runInteractiveShell } from "./framework";
 
-interface SecretMeta {
-  created?: string;
-  expiry?: string;
-  last_used?: string;
+interface SecretEntry {
+  name: string;
+  system: string;
+  description: string;
+  configured: boolean;
+  created: string;
+  expiry: string;
+  status: string;
+  lastUsed: string;
 }
 
 type SecretHealth = "expired" | "expiring" | "active" | "no-expiry";
-
-const EXPIRING_SOON_DAYS = 30;
 
 const HEALTH_ICONS: Record<SecretHealth, vscode.ThemeIcon> = {
   expired: new vscode.ThemeIcon("error", new vscode.ThemeColor("testing.iconFailed")),
@@ -19,50 +21,81 @@ const HEALTH_ICONS: Record<SecretHealth, vscode.ThemeIcon> = {
   "no-expiry": new vscode.ThemeIcon("key"),
 };
 
-function classify(meta: SecretMeta): SecretHealth {
-  if (!meta.expiry) return "no-expiry";
-  const expiryMs = Date.parse(meta.expiry);
-  if (Number.isNaN(expiryMs)) return "no-expiry";
-  const daysRemaining = (expiryMs - Date.now()) / (1000 * 60 * 60 * 24);
-  if (daysRemaining < 0) return "expired";
-  if (daysRemaining <= EXPIRING_SOON_DAYS) return "expiring";
-  return "active";
-}
-
 /**
- * Reads `$CONFIG_DIR/secrets_metadata.yaml` -- created/expiry/last_used
- * dates only, per secret name. The actual secret VALUES live in a
- * separate chmod-600 file this extension never reads or needs to.
+ * Runs `python3 "$SECRETS_MANAGER" list` (the same registry backing the
+ * bash `mt-secrets` menu) via a genuinely interactive shell, rather than
+ * reading secrets_metadata.yaml directly -- the YAML only has entries
+ * for secrets that have been configured at least once, but the tree
+ * needs the FULL supported-secrets registry (configured or not) so an
+ * unconfigured secret can still be right-clicked to add. Never reads
+ * or exposes secret values, only this pipe-delimited status line per
+ * secret name (per secrets_manager.py's own cmd_list docstring):
+ * name|system|description|configured|created|expiry|status|days|last_used
  */
-function parseSecretsMetadata(metadataPath: string): Array<[string, SecretMeta]> {
-  if (!fs.existsSync(metadataPath)) return [];
-  const raw = fs.readFileSync(metadataPath, "utf8");
-  const data = (yaml.load(raw) as Record<string, SecretMeta>) || {};
-  return Object.entries(data).sort(([a], [b]) => a.localeCompare(b));
+async function readSecretsRegistry(): Promise<SecretEntry[]> {
+  const output = await runInteractiveShell('python3 "$SECRETS_MANAGER" list');
+  return output
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const [name, system, description, configured, created, expiry, status, , lastUsed] = line.split("|");
+      return {
+        name,
+        system,
+        description,
+        configured: configured === "true",
+        created,
+        expiry,
+        status,
+        lastUsed,
+      };
+    });
 }
 
-class SecretTreeItem extends vscode.TreeItem {
-  constructor(name: string, meta: SecretMeta) {
-    super(name, vscode.TreeItemCollapsibleState.None);
-    const health = classify(meta);
-    this.iconPath = HEALTH_ICONS[health];
-    this.description = meta.expiry ? `expires ${meta.expiry}` : meta.last_used ? `last used ${meta.last_used}` : "";
+function classify(entry: SecretEntry): SecretHealth {
+  if (!entry.configured) return "no-expiry";
+  if (entry.status === "expired") return "expired";
+  if (entry.status === "expiring") return "expiring";
+  return entry.expiry ? "active" : "no-expiry";
+}
+
+export class SecretTreeItem extends vscode.TreeItem {
+  /** The secret's registry name (e.g. "GEMINI_API_KEY") -- what `mt-secrets --add/--delete` targets. */
+  readonly name: string;
+
+  constructor(entry: SecretEntry) {
+    super(entry.name, vscode.TreeItemCollapsibleState.None);
+    this.name = entry.name;
+    const health = classify(entry);
+    this.iconPath = entry.configured
+      ? HEALTH_ICONS[health]
+      : new vscode.ThemeIcon("circle-slash", new vscode.ThemeColor("disabledForeground"));
+    this.description = entry.configured
+      ? entry.expiry
+        ? `expires ${entry.expiry}`
+        : entry.lastUsed
+          ? `last used ${entry.lastUsed}`
+          : "configured"
+      : "not configured";
     this.tooltip = new vscode.MarkdownString(
-      `**${name}**\n\n` +
-        `- Created: ${meta.created ?? "unknown"}\n` +
-        `- Expiry: ${meta.expiry ?? "none"}\n` +
-        `- Last used: ${meta.last_used ?? "never recorded"}\n` +
-        `- Status: ${health}`,
+      `**${entry.name}**\n\n` +
+        `${entry.description}\n\n` +
+        `- System: ${entry.system}\n` +
+        `- Created: ${entry.created || "unknown"}\n` +
+        `- Expiry: ${entry.expiry || "none"}\n` +
+        `- Last used: ${entry.lastUsed || "never recorded"}\n` +
+        `- Status: ${entry.configured ? health : "not configured"}`,
     );
-    this.contextValue = "mtDevopsSecret";
+    // Suffixed with configured/unconfigured so package.json's
+    // view/item/context menu only offers "Delete" on a secret that's
+    // actually set -- mirroring the Docker/Jobs adaptive action sets.
+    this.contextValue = entry.configured ? "mtDevopsSecret-configured" : "mtDevopsSecret-unconfigured";
   }
 }
 
 export class SecretsProvider implements vscode.TreeDataProvider<SecretTreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
-
-  constructor(private readonly metadataPath: string) {}
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
@@ -72,7 +105,8 @@ export class SecretsProvider implements vscode.TreeDataProvider<SecretTreeItem> 
     return element;
   }
 
-  getChildren(): SecretTreeItem[] {
-    return parseSecretsMetadata(this.metadataPath).map(([name, meta]) => new SecretTreeItem(name, meta));
+  async getChildren(): Promise<SecretTreeItem[]> {
+    const entries = await readSecretsRegistry();
+    return entries.map((entry) => new SecretTreeItem(entry));
   }
 }
