@@ -44,6 +44,12 @@ jobs:
             (
               cd "$pkg_dir"
               npm version "$RAW_VERSION" --allow-same-version --no-git-tag-version
+              # Manifest-only extension packs have no dependencies, so this
+              # is a fast no-op for them -- but a coded package (like
+              # mt-devops-companion) needs its devDependencies (esbuild,
+              # typescript) actually installed before vsce's
+              # vscode:prepublish step can bundle it.
+              npm install
               npx @vscode/vsce package -o "../../release/"
             )
           done
