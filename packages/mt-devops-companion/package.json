@@ -27,8 +27,67 @@
       {
         "command": "mtDevops.showStatus",
         "title": "MT DevOps: Show Status Dashboard"
+      },
+      {
+        "command": "mtDevops.refreshJobs",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mtDevops.refreshRepoHub",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mtDevops.refreshSecrets",
+        "title": "Refresh",
+        "icon": "$(refresh)"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mtDevops",
+          "title": "MT DevOps",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "mtDevops": [
+        {
+          "id": "mtDevopsJobs",
+          "name": "Jobs"
+        },
+        {
+          "id": "mtDevopsRepoHub",
+          "name": "Repo Hub"
+        },
+        {
+          "id": "mtDevopsSecrets",
+          "name": "Secrets"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "mtDevops.refreshJobs",
+          "when": "view == mtDevopsJobs",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.refreshRepoHub",
+          "when": "view == mtDevopsRepoHub",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.refreshSecrets",
+          "when": "view == mtDevopsSecrets",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run build",
@@ -38,9 +97,11 @@
     "sync-commands": "node scripts/generate-commands.mjs"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.80.0",
     "esbuild": "^0.23.1",
+    "js-yaml": "^4.1.0",
     "typescript": "^5.5.4"
   }
 }

@@ -1,6 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { resolveFrameworkPaths } from "./framework";
+import { JobsProvider } from "./jobsProvider";
+import { RepoHubProvider } from "./repoHubProvider";
+import { SecretsProvider } from "./secretsProvider";
 
 interface CatalogEntry {
   id: string;
@@ -57,13 +61,66 @@ async function pickAndRunCommand(catalog: CatalogEntry[]): Promise<void> {
   }
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+/**
+ * Registers a tree view backed by a file that may not exist yet (e.g. no
+ * background job has ever run), watching it for live updates without any
+ * polling or shell-outs -- the provider itself just re-reads the file
+ * whenever the watcher fires.
+ */
+function registerWatchedView<T>(
+  context: vscode.ExtensionContext,
+  viewId: string,
+  filePath: string,
+  provider: vscode.TreeDataProvider<T> & { refresh: () => void },
+  refreshCommandId: string,
+): void {
+  context.subscriptions.push(vscode.window.registerTreeDataProvider(viewId, provider));
+  context.subscriptions.push(vscode.commands.registerCommand(refreshCommandId, () => provider.refresh()));
+
+  const watcher = vscode.workspace.createFileSystemWatcher(filePath);
+  watcher.onDidChange(() => provider.refresh());
+  watcher.onDidCreate(() => provider.refresh());
+  watcher.onDidDelete(() => provider.refresh());
+  context.subscriptions.push(watcher);
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const catalog = loadCatalog(context.extensionUri);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("mtDevops.runCommand", () => pickAndRunCommand(catalog)),
     vscode.commands.registerCommand("mtDevops.showStatus", () => runInTerminal("mt-status")),
   );
+
+  try {
+    const { cacheDir, configDir } = await resolveFrameworkPaths();
+
+    registerWatchedView(
+      context,
+      "mtDevopsJobs",
+      path.join(cacheDir, ".mt_jobs.tsv"),
+      new JobsProvider(path.join(cacheDir, ".mt_jobs.tsv")),
+      "mtDevops.refreshJobs",
+    );
+    registerWatchedView(
+      context,
+      "mtDevopsRepoHub",
+      path.join(cacheDir, ".vcs_hub.json"),
+      new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json")),
+      "mtDevops.refreshRepoHub",
+    );
+    registerWatchedView(
+      context,
+      "mtDevopsSecrets",
+      path.join(configDir, "secrets_metadata.yaml"),
+      new SecretsProvider(path.join(configDir, "secrets_metadata.yaml")),
+      "mtDevops.refreshSecrets",
+    );
+  } catch (err) {
+    vscode.window.showWarningMessage(
+      `MT DevOps: couldn't resolve framework paths, tree views are unavailable (${err instanceof Error ? err.message : err}).`,
+    );
+  }
 }
 
 export function deactivate(): void {}
