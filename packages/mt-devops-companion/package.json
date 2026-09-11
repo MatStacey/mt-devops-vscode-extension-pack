@@ -146,6 +146,20 @@
         "command": "mtDevops.updateAllRepos",
         "title": "Update All Repos (fill gaps only)",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "mtDevops.updateRepoIndexFromExplorer",
+        "title": "MT DevOps: Update Repo Index (fill gaps only)"
+      },
+      {
+        "command": "mtDevops.secretAdd",
+        "title": "Add / Update Secret",
+        "icon": "$(key)"
+      },
+      {
+        "command": "mtDevops.secretDelete",
+        "title": "Delete Secret",
+        "icon": "$(trash)"
       }
     ],
     "viewsContainers": {
@@ -212,6 +226,10 @@
       "explorer/context": [
         {
           "command": "mtDevops.copyForLLM",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.updateRepoIndexFromExplorer",
           "group": "7_modification"
         }
       ],
@@ -332,6 +350,16 @@
           "command": "mtDevops.updateCategory",
           "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
           "group": "2_index@2"
+        },
+        {
+          "command": "mtDevops.secretAdd",
+          "when": "view == mtDevopsSecrets && viewItem =~ /^mtDevopsSecret-/",
+          "group": "1_manage@1"
+        },
+        {
+          "command": "mtDevops.secretDelete",
+          "when": "view == mtDevopsSecrets && viewItem == mtDevopsSecret-configured",
+          "group": "1_manage@2"
         }
       ]
     }
@@ -344,11 +372,9 @@
     "sync-commands": "node scripts/generate-commands.mjs"
   },
   "devDependencies": {
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.93.0",
     "esbuild": "^0.23.1",
-    "js-yaml": "^4.1.0",
     "typescript": "^5.5.4"
   },
   "dependencies": {

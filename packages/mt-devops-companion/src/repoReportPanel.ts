@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
+import { runInTerminal, shellQuote } from "./framework";
 import type { RepoMeta } from "./repoHubProvider";
 
 interface CommitEntry {
@@ -327,6 +328,7 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     <button id="openBtn">Open in VS Code</button>
     ${browserButton}
     ${pullButton}
+    <button id="updateIndexBtn">Update Index (fill gaps only)</button>
   </div>
 
   ${readmeSection}
@@ -352,6 +354,9 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
       btn.addEventListener("click", () => {
         vscode.postMessage({ command: "fetchBranch", branch: btn.getAttribute("data-branch") });
       });
+    });
+    document.getElementById("updateIndexBtn").addEventListener("click", () => {
+      vscode.postMessage({ command: "updateIndex" });
     });
   </script>
 </body>
@@ -407,6 +412,15 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
           vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(displayedRepoPath), {
             forceNewWindow: true,
           });
+          return;
+        }
+        if (message.command === "updateIndex") {
+          // Gap-fill indexing calls the AI provider and can take a while,
+          // and the Repo Hub tree already watches .vcs_hub.json and will
+          // refresh itself once mt-hub rewrites it -- same reasoning as
+          // the equivalent right-click actions, so this runs visibly in
+          // the terminal rather than captured.
+          runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(displayedRepoPath))}`);
           return;
         }
         if (message.command === "openInBrowser") {

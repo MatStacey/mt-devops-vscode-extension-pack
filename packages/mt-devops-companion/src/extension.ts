@@ -9,7 +9,7 @@ import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
 import { RepoCategoryItem, RepoHubProvider, RepoTreeItem } from "./repoHubProvider";
 import { showRepoReport } from "./repoReportPanel";
-import { SecretsProvider } from "./secretsProvider";
+import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
 import { StatusProvider } from "./statusProvider";
 
 interface CatalogEntry {
@@ -123,6 +123,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       runInTerminal(`mt-copy ${shellQuote(target.fsPath)}`);
     }),
+    // Explorer counterpart to the Repo Hub tree's own right-click "Update
+    // This Repo" -- lets a repo be gap-filled from wherever it's already
+    // open in the editor, without needing to also find it in the Repo Hub
+    // sidebar. Filters by basename (mt-hub's own -r/--repo match), so this
+    // is only meaningful when right-clicking a repo's root folder, not an
+    // arbitrary file/subfolder inside one.
+    vscode.commands.registerCommand("mtDevops.updateRepoIndexFromExplorer", (uri: vscode.Uri | undefined) => {
+      const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+      if (!target) {
+        vscode.window.showWarningMessage("MT DevOps: select a repository folder first.");
+        return;
+      }
+      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(target.fsPath))}`);
+    }),
 
     // Docker: single-container actions from the sidebar's context menu.
     // Start/stop/restart shell out to the framework's own
@@ -165,6 +179,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("mtDevops.jobsClearFinished", () =>
       runAndNotify("mt-jobs --clean", "MT DevOps: clear failed"),
     ),
+
+    // Secrets: "Add / Update" always runs in a visible terminal, whether
+    // the secret is already configured or not -- the real mt-add-*-key
+    // command it dispatches to (via mt-secrets --add) prompts for the
+    // value on /dev/tty, so a captured/toast-only call (like the Jobs
+    // actions above) would just hang with no visible prompt. "Delete" is
+    // fast and non-interactive, so it's captured with a toast, same as
+    // Jobs, but confirmed first since it's destructive and has no undo.
+    vscode.commands.registerCommand("mtDevops.secretAdd", (item: SecretTreeItem) =>
+      runInTerminal(`mt-secrets --add ${shellQuote(item.name)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.secretDelete", async (item: SecretTreeItem) => {
+      const choice = await vscode.window.showWarningMessage(
+        `Delete the ${item.name} secret? This removes it from secrets.sh immediately -- there's no undo.`,
+        { modal: true },
+        "Delete",
+      );
+      if (choice !== "Delete") return;
+      await runAndNotify(`mt-secrets --delete ${shellQuote(item.name)}`, "MT DevOps: delete failed");
+    }),
 
     // Repo Hub: click opens the report webview (registered below via
     // repoHubProvider.ts's own tree-item command); right-click offers
@@ -232,7 +266,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       context,
       "mtDevopsSecrets",
       path.join(configDir, "secrets_metadata.yaml"),
-      new SecretsProvider(path.join(configDir, "secrets_metadata.yaml")),
+      new SecretsProvider(),
       "mtDevops.refreshSecrets",
     );
   } catch (err) {
