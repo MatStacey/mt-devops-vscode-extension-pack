@@ -1,0 +1,46 @@
+{
+  "name": "mt-devops-companion",
+  "displayName": "MT DevOps Framework Companion",
+  "description": "Command palette access to the MT DevOps Framework's full mt- command catalog, without needing to remember command names or open a terminal fuzzy-finder.",
+  "version": "0.0.1",
+  "publisher": "MatStacey",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MatStacey/mt-devops-vscode-extension-pack",
+    "directory": "packages/mt-devops-companion"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mtDevops.runCommand",
+        "title": "MT DevOps: Run Command..."
+      },
+      {
+        "command": "mtDevops.showStatus",
+        "title": "MT DevOps: Show Status Dashboard"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "watch": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "compile": "tsc --noEmit -p ./",
+    "sync-commands": "node scripts/generate-commands.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.80.0",
+    "esbuild": "^0.23.1",
+    "typescript": "^5.5.4"
+  }
+}

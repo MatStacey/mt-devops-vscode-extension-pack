@@ -1,0 +1,1574 @@
+[
+  {
+    "id": "mtDevops.catalog.mt_reload_config",
+    "command": "mt-reload-config",
+    "description": "Config: Forcefully re-parse config.yaml and reload environment variables",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.boot_run",
+    "command": "boot-run",
+    "description": "Dev: Spring Boot - Run application",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mci",
+    "command": "mci",
+    "description": "Dev: Maven - Clean and Install",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.pip_load",
+    "command": "pip-load",
+    "description": "Dev: Python - Install pip requirements",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.pip_save",
+    "command": "pip-save",
+    "description": "Dev: Python - Save pip requirements",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.ruff_fmt",
+    "command": "ruff-fmt",
+    "description": "Dev: Python - Format Python files and imports using Ruff (recursive)",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.sh_fmt_all",
+    "command": "sh-fmt-all",
+    "description": "Dev: Shell - Format all shell scripts in current directory (recursive)",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.shfmtlw",
+    "command": "shfmtlw",
+    "description": "Dev: Shell - Format all shell scripts in current directory (recursive) (Alias)",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.venv_make",
+    "command": "venv-make",
+    "description": "Dev: Python - Create & active Python venv",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.venv_up",
+    "command": "venv-up",
+    "description": "Dev: Python - Activate existing Python venv",
+    "category": "Development & Build Tools"
+  },
+  {
+    "id": "mtDevops.catalog.gcpp",
+    "command": "gcpp",
+    "description": "GCP: Legacy shortcut to set project",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.bq_ls",
+    "command": "bq-ls",
+    "description": "GCP: BigQuery - List datasets in project",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gce_ls",
+    "command": "gce-ls",
+    "description": "GCP: Compute - List all VM instances",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gce_ssh",
+    "command": "gce-ssh",
+    "description": "GCP: Compute - SSH into an instance",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_gar_ls",
+    "command": "gcl-gar-ls",
+    "description": "GCP: Artifact Registry - List repositories",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_iam_ls",
+    "command": "gcl-iam-ls",
+    "description": "GCP: IAM - List service accounts in active project",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_ps_subs",
+    "command": "gcl-ps-subs",
+    "description": "GCP: PubSub - List subscriptions",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_ps_topics",
+    "command": "gcl-ps-topics",
+    "description": "GCP: PubSub - List topics",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_crf_ls",
+    "command": "gcp-crf-ls",
+    "description": "GCP: Cloud Run Functions - List functions",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcs_ls",
+    "command": "gcs-ls",
+    "description": "GCP: Cloud Storage - List buckets or contents",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.cat",
+    "command": "cat",
+    "description": "CLI: bat - Print file contents with syntax highlighting",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.ccat",
+    "command": "ccat",
+    "description": "CLI: bat - Print file contents with line numbers & Git gutters",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.json_fmt",
+    "command": "json-fmt",
+    "description": "CLI: jq - Pretty-print JSON stream",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.ll",
+    "command": "ll",
+    "description": "CLI: eza - Detailed list with Git status",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.ls",
+    "command": "ls",
+    "description": "CLI: eza - List files with directories first",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.rg",
+    "command": "rg",
+    "description": "CLI: rg - Search with smart case, include hidden, ignore .git",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.tree",
+    "command": "tree",
+    "description": "CLI: eza - Display directory structure as a tree",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.tree_clean",
+    "command": "tree-clean",
+    "description": "CLI: eza - Display directory structure ignoring bloat (.git, node_modules, etc)",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.yaml_fmt",
+    "command": "yaml-fmt",
+    "description": "CLI: yq - Pretty-print YAML stream",
+    "category": "Modern CLI Replacements"
+  },
+  {
+    "id": "mtDevops.catalog.mt_search",
+    "command": "mt-search",
+    "description": "MyTools: Search through available mytools commands (Alias)",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.cd_mt_git_local",
+    "command": "cd-mt-git-local",
+    "description": "System: Change directory to dotfiles repository root (Alias)",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.mt_history",
+    "command": "mt-history",
+    "description": "System: Display history of executed framework commands (Alias)",
+    "category": "Private Aliases (local-only -- never synced to the framework repo)"
+  },
+  {
+    "id": "mtDevops.catalog.cd_bashd",
+    "command": "cd-bashd",
+    "description": "System: Change directory to ~/.bash.d",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.cd_git_home",
+    "command": "cd-git-home",
+    "description": "System: Change directory to ~/vcs",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.cd_git_personal",
+    "command": "cd-git-personal",
+    "description": "System: Change directory to ~/vcs/personal",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.refresh",
+    "command": "refresh",
+    "description": "System: Reload Bash profile and caches",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.reload",
+    "command": "reload",
+    "description": "System: Reload Bash profile and caches",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.sys_update_install",
+    "command": "sys-update-install",
+    "description": "System: Update, Upgrade, Boostrap, and Reload",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tf",
+    "command": "tf",
+    "description": "Terraform: Core Execution",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfa",
+    "command": "tfa",
+    "description": "Terraform: Apply changes",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfap",
+    "command": "tfap",
+    "description": "Terraform: Apply the saved plan file",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfay",
+    "command": "tfay",
+    "description": "Terraform: Apply changes (Auto-Approve)",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfc",
+    "command": "tfc",
+    "description": "Terraform: Open interactive console",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfd",
+    "command": "tfd",
+    "description": "Terraform: Destroy infrastructure",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfdy",
+    "command": "tfdy",
+    "description": "Terraform: Destroy infrastructure (Auto-Approve)",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tff",
+    "command": "tff",
+    "description": "Terraform: Format all files recursively",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfin",
+    "command": "tfin",
+    "description": "Terraform: Initialize working directory",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfinu",
+    "command": "tfinu",
+    "description": "Terraform: Initialize and upgrade modules/providers",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfo",
+    "command": "tfo",
+    "description": "Terraform: Read outputs from state",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfp",
+    "command": "tfp",
+    "description": "Terraform: Generate execution plan",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfpd",
+    "command": "tfpd",
+    "description": "Terraform: Generate destruction plan",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfpo",
+    "command": "tfpo",
+    "description": "Terraform: Generate a saved plan file (tfplan)",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tf_refresh",
+    "command": "tf-refresh",
+    "description": "Terraform: Refresh state without applying changes (Modern)",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfs",
+    "command": "tfs",
+    "description": "Terraform: State management commands",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfsh",
+    "command": "tfsh",
+    "description": "Terraform: Show current state or plan",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfsls",
+    "command": "tfsls",
+    "description": "Terraform: List resources in state",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfsmv",
+    "command": "tfsmv",
+    "description": "Terraform: Move an item in state",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfsrm",
+    "command": "tfsrm",
+    "description": "Terraform: Remove an item from state",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfssw",
+    "command": "tfssw",
+    "description": "Terraform: Show a single resource in state",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfv",
+    "command": "tfv",
+    "description": "Terraform: Validate configuration files",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfw",
+    "command": "tfw",
+    "description": "Terraform: Workspace management commands",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfwde",
+    "command": "tfwde",
+    "description": "Terraform: Delete a workspace",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfwls",
+    "command": "tfwls",
+    "description": "Terraform: List workspaces",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfwnw",
+    "command": "tfwnw",
+    "description": "Terraform: Create a new workspace",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfwst",
+    "command": "tfwst",
+    "description": "Terraform: Select an existing workspace",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfwsw",
+    "command": "tfwsw",
+    "description": "Terraform: Show the current workspace name",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tfy",
+    "command": "tfy",
+    "description": "Terraform: Shortcut alias for tf-yaml",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tf_scan",
+    "command": "tf-scan",
+    "description": "Terraform: Scan local terraform directory (./terraform) with Checkov",
+    "category": "Terraform & Kubernetes Wrappers"
+  },
+  {
+    "id": "mtDevops.catalog.git_clean_local",
+    "command": "git-clean-local",
+    "description": "Git: Delete local and remote branches merged into default branch",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.mt_hard_reload",
+    "command": "mt-hard-reload",
+    "description": "System: Forcefully clear and rebuild all background caches and reload profile",
+    "category": "Zoxide (Smart cd replacement)"
+  },
+  {
+    "id": "mtDevops.catalog.mtindp",
+    "command": "mtindp",
+    "description": "MT-Framework: Update the DevOps-MT-Framework with Shellcheck and Backup Creation",
+    "category": "Zoxide (Smart cd replacement)"
+  },
+  {
+    "id": "mtDevops.catalog.mtupd",
+    "command": "mtupd",
+    "description": "Version Control (Git) - Profile Synchronisation: Auto-sync framework with Shellcheck, Backup, AI Commit-Grouping/README Summary, and Auto-Merge",
+    "category": "Zoxide (Smart cd replacement)"
+  },
+  {
+    "id": "mtDevops.catalog.mtupd_fast",
+    "command": "mtupd-fast",
+    "description": "Version Control (Git) - Fast Update: Update Framework with Shellcheck, Backup and Auto-Merge, skipping AI commit-grouping/README summarization",
+    "category": "Zoxide (Smart cd replacement)"
+  },
+  {
+    "id": "mtDevops.catalog.ai",
+    "command": "ai",
+    "description": "AI: Query configured LLM with prompt and optional context",
+    "category": "AI Workflows & LLM API Integration"
+  },
+  {
+    "id": "mtDevops.catalog.ai_explain",
+    "command": "ai-explain",
+    "description": "AI: Explain a terminal command in detail, grounding the explanation in",
+    "category": "AI Workflows & LLM API Integration"
+  },
+  {
+    "id": "mtDevops.catalog.mt_ai_debug",
+    "command": "mt-ai-debug",
+    "description": "AI: Debug and explain the last failed terminal command",
+    "category": "AI Workflows & LLM API Integration"
+  },
+  {
+    "id": "mtDevops.catalog.mt_ai_quota",
+    "command": "mt-ai-quota",
+    "description": "AI: Check API quota and rate limits for the active AI provider",
+    "category": "AI Workflows & LLM API Integration"
+  },
+  {
+    "id": "mtDevops.catalog.base64_cli",
+    "command": "base64-cli",
+    "description": "System: Encode or decode a string, file, or stream to/from Base64",
+    "category": "Base64 Encoding & Decoding Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.base64_dec",
+    "command": "base64-dec",
+    "description": "System: Decode a Base64 string, file, or stream (shortcut for `base64-cli -d`)",
+    "category": "Base64 Encoding & Decoding Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.base64_enc",
+    "command": "base64-enc",
+    "description": "System: Encode a string, file, or stream to Base64 (shortcut for `base64-cli`)",
+    "category": "Base64 Encoding & Decoding Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.mt_add_sync_url",
+    "command": "mt-add-sync-url",
+    "description": "Config: Set the sync repository URL",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_become_collaborator",
+    "command": "mt-become-collaborator",
+    "description": "Config: Interactive one-time setup wizard for collaborators who don't",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_get_gemini_status",
+    "command": "mt-get-gemini-status",
+    "description": "AI: Print current Gemini API model version and extended reasoning mode toggle",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_load_config",
+    "command": "mt-load-config",
+    "description": "Config: Forcefully re-parse config.yaml and reload environment variables",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_migrate_config",
+    "command": "mt-migrate-config",
+    "description": "Config: Detect and clean up legacy config.yaml keys left behind by past",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_open_config",
+    "command": "mt-open-config",
+    "description": "Config: Open bash.d directory and config.yaml in IDE",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_set_cicd",
+    "command": "mt-set-cicd",
+    "description": "Config: Set default CI/CD provider",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_set_default_ai",
+    "command": "mt-set-default-ai",
+    "description": "Config: Set default AI model provider",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_set_default_ide",
+    "command": "mt-set-default-ide",
+    "description": "Config: Set default terminal IDE launcher",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_set_theme",
+    "command": "mt-set-theme",
+    "description": "Config: Set terminal color theme",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_setup",
+    "command": "mt-setup",
+    "description": "Config: Launch the interactive Master Setup Wizard Menu",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_setup_ai",
+    "command": "mt-setup-ai",
+    "description": "Config: Interactive AI Setup Menu (deprecated alias)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_setup_cicd",
+    "command": "mt-setup-cicd",
+    "description": "Config: Interactive CI/CD Setup Menu (deprecated alias)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_setup_docker",
+    "command": "mt-setup-docker",
+    "description": "Config: Interactive Docker Setup Menu (deprecated alias)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_setup_exports",
+    "command": "mt-setup-exports",
+    "description": "Config: Interactive Exports Setup Menu (deprecated alias)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_setup_git",
+    "command": "mt-setup-git",
+    "description": "Config: Interactive Git Setup Menu (deprecated alias)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_setup_paths",
+    "command": "mt-setup-paths",
+    "description": "Config: Interactive Paths Setup Menu (deprecated alias)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_setup_system",
+    "command": "mt-setup-system",
+    "description": "Config: Interactive System Setup Menu (deprecated alias)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_toggle_ai",
+    "command": "mt-toggle-ai",
+    "description": "Config: Toggle global AI prompt and workflow integration (true/false)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_toggle_display",
+    "command": "mt-toggle-display",
+    "description": "Config: Show/hide individual prompt segments (Git, GCP, AI provider,",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_toggle_format_on_push",
+    "command": "mt-toggle-format-on-push",
+    "description": "Config: Toggle global format-on-push behavior (true/false)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_toggle_update_confirm",
+    "command": "mt-toggle-update-confirm",
+    "description": "Config: Toggle whether mt-get-update pauses to confirm before overwriting",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_wizard_ai",
+    "command": "mt-wizard-ai",
+    "description": "Config: Interactive AI Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_wizard_cicd",
+    "command": "mt-wizard-cicd",
+    "description": "Config: Interactive CI/CD Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_wizard_docker",
+    "command": "mt-wizard-docker",
+    "description": "Config: Interactive Docker Configuration Wizard -- restart blocklist",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_wizard_exports",
+    "command": "mt-wizard-exports",
+    "description": "Config: Interactive Exports Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_wizard_git",
+    "command": "mt-wizard-git",
+    "description": "Config: Interactive Git Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_wizard_minikube",
+    "command": "mt-wizard-minikube",
+    "description": "Config: Interactive Minikube Configuration Wizard -- sets the",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_wizard_paths",
+    "command": "mt-wizard-paths",
+    "description": "Config: Interactive Paths Setup Menu -- prompts for and persists the",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_wizard_system",
+    "command": "mt-wizard-system",
+    "description": "Config: Interactive System Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.kubectl",
+    "command": "kubectl",
+    "description": "Kubernetes: Core kubectl wrapper (preserves args)",
+    "category": "Container Orchestration"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_ctx",
+    "command": "k8s-ctx",
+    "description": "Kubernetes: Switch the active kubectl context",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_delete",
+    "command": "k8s-delete",
+    "description": "Kubernetes: Delete a resource, always confirmed via the destructive-op",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_gke_connect",
+    "command": "k8s-gke-connect",
+    "description": "Kubernetes: Fetch credentials for a live GKE cluster and switch to it",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_ns",
+    "command": "k8s-ns",
+    "description": "Kubernetes: Get or interactively set the active namespace in the",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_pods",
+    "command": "k8s-pods",
+    "description": "Kubernetes: List pods in a clean table",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_restart",
+    "command": "k8s-restart",
+    "description": "Kubernetes: Trigger a rolling restart of a deployment -- the correct",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_scale",
+    "command": "k8s-scale",
+    "description": "Kubernetes: Scale a deployment's replica count. Routed through the",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_shell",
+    "command": "k8s-shell",
+    "description": "Kubernetes: Interactive fuzzy-finder to exec into a running pod",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_status",
+    "command": "k8s-status",
+    "description": "Kubernetes: Dashboard summarizing the active context -- cluster,",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.k8s_tail",
+    "command": "k8s-tail",
+    "description": "Kubernetes: Concurrently tail logs from multiple selected pods",
+    "category": "Container Orchestration (Kubernetes) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.docker_containers",
+    "command": "docker-containers",
+    "description": "Docker: Interactive container management console -- fzf-pick any",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_daemon",
+    "command": "docker-daemon",
+    "description": "Docker: Start, stop, restart, or check the status of the Docker daemon",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_ls",
+    "command": "docker-ls",
+    "description": "Docker: List all running containers in a clean table format",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_nuke",
+    "command": "docker-nuke",
+    "description": "Docker: Aggressive cleanup of all unused containers, images, and volumes",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_reboot",
+    "command": "docker-reboot",
+    "description": "Docker: Recreate a single Compose project",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_reboot_all",
+    "command": "docker-reboot-all",
+    "description": "Docker: Recreate every running Docker Compose project on this host --",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_sandbox",
+    "command": "docker-sandbox",
+    "description": "Docker: Spin up a temporary, throwaway container sandbox",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_shell",
+    "command": "docker-shell",
+    "description": "Docker: Interactive fuzzy-finder to exec into a running container",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_tail",
+    "command": "docker-tail",
+    "description": "Docker: Concurrently tail logs from multiple selected containers",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_update",
+    "command": "docker-update",
+    "description": "Docker: Check a Compose project for image updates and optionally",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_build",
+    "command": "docker-build",
+    "description": "Docker: Build an image from a Dockerfile, auto-versioning it (see",
+    "category": "Docker: Image Build, Versioning & Registry Push"
+  },
+  {
+    "id": "mtDevops.catalog.docker_push",
+    "command": "docker-push",
+    "description": "Docker: Tag (via docker-tag) and push a locally-built image to a",
+    "category": "Docker: Image Build, Versioning & Registry Push"
+  },
+  {
+    "id": "mtDevops.catalog.docker_release",
+    "command": "docker-release",
+    "description": "Docker: Build and push in one step -- the convenience wrapper around",
+    "category": "Docker: Image Build, Versioning & Registry Push"
+  },
+  {
+    "id": "mtDevops.catalog.docker_tag",
+    "command": "docker-tag",
+    "description": "Docker: Tag a locally-built image with a registry's fully-qualified",
+    "category": "Docker: Image Build, Versioning & Registry Push"
+  },
+  {
+    "id": "mtDevops.catalog.docker_deploy",
+    "command": "docker-deploy",
+    "description": "Docker->Helm bridge: Run a locally-built image on whichever cluster is",
+    "category": "Docker -> Kubernetes/Helm/Minikube Bridge"
+  },
+  {
+    "id": "mtDevops.catalog.mt_blueprint",
+    "command": "mt-blueprint",
+    "description": "Framework: Scaffold a new repository using standardized DevOps blueprints",
+    "category": "Framework: Repository Scaffolding from Blueprints"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_config",
+    "command": "gcl-config",
+    "description": "GCP: List active configuration properties",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_export_vars",
+    "command": "gcl-export-vars",
+    "description": "GCP: Export PROJECT_ID and PROJECT_NUMBER env vars to shell",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_get",
+    "command": "gcl-get",
+    "description": "GCP: Print an active gcloud configuration property",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_get_project",
+    "command": "gcl-get-project",
+    "description": "GCP: Print active project ID (shortcut for `gcl-get project`)",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_get_project_number",
+    "command": "gcl-get-project-number",
+    "description": "GCP: Print active project Number, API call required (shortcut for `gcl-get project-number`)",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_get_region",
+    "command": "gcl-get-region",
+    "description": "GCP: Print active compute region (shortcut for `gcl-get region`)",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_get_user",
+    "command": "gcl-get-user",
+    "description": "GCP: Print active user account (shortcut for `gcl-get user`)",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_get_zone",
+    "command": "gcl-get-zone",
+    "description": "GCP: Print active compute zone (shortcut for `gcl-get zone`)",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_org_policies",
+    "command": "gcl-org-policies",
+    "description": "GCP: List org policies for active project",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_update",
+    "command": "gcl-update",
+    "description": "GCP: Update Google Cloud CLI tools",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_login",
+    "command": "gcp-login",
+    "description": "GCP: Login to user & application default",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_login_adc",
+    "command": "gcp-login-adc",
+    "description": "GCP: Login to application default only",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_set_project",
+    "command": "gcp-set-project",
+    "description": "GCP: Switch active project",
+    "category": "GCP: Configuration & Authentication"
+  },
+  {
+    "id": "mtDevops.catalog.bq_query",
+    "command": "bq-query",
+    "description": "GCP: Run standard SQL query in BigQuery",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_as_json",
+    "command": "gcl-as-json",
+    "description": "GCP: Run any gcloud command and output as formatted JSON",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_crf_logs",
+    "command": "gcp-crf-logs",
+    "description": "GCP: Tail logs of a Cloud Run Function",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_gar_docker",
+    "command": "gcp-gar-docker",
+    "description": "GCP: Configure Docker auth for Artifact Registry",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_get_secret",
+    "command": "gcp-get-secret",
+    "description": "GCP: Read the latest payload of a secret",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_iam_show",
+    "command": "gcp-iam-show",
+    "description": "GCP: View IAM policy for the active project",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.gcp_ps_pull",
+    "command": "gcp-ps-pull",
+    "description": "GCP: Pull and auto-ack one message from a Pub/Sub subscription",
+    "category": "GCP: Resources & Services"
+  },
+  {
+    "id": "mtDevops.catalog.mt_alias",
+    "command": "mt-alias",
+    "description": "System: Interactively create or update an alias",
+    "category": "General System Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.mt_top_files",
+    "command": "mt-top-files",
+    "description": "System: Display the top largest files in a directory",
+    "category": "General System Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.mt_vcs_audit",
+    "command": "mt-vcs-audit",
+    "description": "System: Audit VCS root for unorganized files and directories",
+    "category": "General System Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.mt_clone",
+    "command": "mt-clone",
+    "description": "Git: Clone every repository in a source-control provider's project",
+    "category": "Git: Bulk Repository Cloning (mt-clone)"
+  },
+  {
+    "id": "mtDevops.catalog.mt_bulk_update",
+    "command": "mt-bulk-update",
+    "description": "Git: Bulk-update every local repository under VCS_ROOT -- fetches each",
+    "category": "Git: Bulk Repository Updates"
+  },
+  {
+    "id": "mtDevops.catalog.google_fmt",
+    "command": "google-fmt",
+    "description": "Formats Python and Shell scripts according to Google Style Guides.",
+    "category": "Google Style Code Formatting"
+  },
+  {
+    "id": "mtDevops.catalog.helm_install",
+    "command": "helm-install",
+    "description": "Helm: Install a chart as a new release in the current namespace",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.helm_list",
+    "command": "helm-list",
+    "description": "Helm: List releases in a clean table",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.helm_repo",
+    "command": "helm-repo",
+    "description": "Helm: Manage chart repositories -- list/add/update, mirroring",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.helm_rollback",
+    "command": "helm-rollback",
+    "description": "Helm: Roll back a release to a previous revision, always confirmed via",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.helm_search",
+    "command": "helm-search",
+    "description": "Helm: Search configured repos for a chart",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.helm_status",
+    "command": "helm-status",
+    "description": "Helm: Dashboard summarizing helm's view of the active context -- CLI",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.helm_uninstall",
+    "command": "helm-uninstall",
+    "description": "Helm: Uninstall a release, always confirmed via the destructive-op",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.helm_upgrade",
+    "command": "helm-upgrade",
+    "description": "Helm: Upgrade an existing release to a new chart/version -- the",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.helm_values",
+    "command": "helm-values",
+    "description": "Helm: Show the user-supplied values for a release",
+    "category": "Helm (Kubernetes Package Manager) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.tf_val_all",
+    "command": "tf-val-all",
+    "description": "Terraform: Recursively validate and scan all Terraform directories",
+    "category": "Infrastructure as Code"
+  },
+  {
+    "id": "mtDevops.catalog.mt_copy",
+    "command": "mt-copy",
+    "description": "LLM: Copy a file or directory tree to clipboard with headers and extension filters",
+    "category": "LLM Context & Export Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.mt_export",
+    "command": "mt-export",
+    "description": "LLM: Export codebase to text/zip for LLM context window using dynamic schemas",
+    "category": "LLM Context & Export Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.mt_export_cleanup",
+    "command": "mt-export-cleanup",
+    "description": "LLM: Safely remove stale mt-export output from EXPORT_DIR",
+    "category": "LLM Context & Export Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.mk_addons",
+    "command": "mk-addons",
+    "description": "Minikube: fzf-pick an addon and toggle it on/off based on its current",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mk_dashboard",
+    "command": "mk-dashboard",
+    "description": "Minikube: Launch the Kubernetes dashboard web UI in the background via",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mk_delete",
+    "command": "mk-delete",
+    "description": "Minikube: Permanently delete a local cluster and its profile, always",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mk_load_image",
+    "command": "mk-load-image",
+    "description": "Minikube: Load a locally-built Docker image into the cluster's",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mk_ssh",
+    "command": "mk-ssh",
+    "description": "Minikube: Open an interactive shell on the cluster's node -- the",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mk_start",
+    "command": "mk-start",
+    "description": "Minikube: Create (or resume) a local cluster using the configured",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mk_status",
+    "command": "mk-status",
+    "description": "Minikube: Dashboard summarizing a local cluster's lifecycle state --",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mk_stop",
+    "command": "mk-stop",
+    "description": "Minikube: Stop a local cluster without destroying it -- state is",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mk_tunnel",
+    "command": "mk-tunnel",
+    "description": "Minikube: Open a network tunnel so LoadBalancer-type services get a",
+    "category": "Minikube (Local Kubernetes Cluster) Tools"
+  },
+  {
+    "id": "mtDevops.catalog.mt_hub",
+    "command": "mt-hub",
+    "description": "System: Interactive AI-powered Repository Dashboard",
+    "category": "MT Repo Hub - AI & Heuristic Metadata Dashboard"
+  },
+  {
+    "id": "mtDevops.catalog.mt",
+    "command": "mt",
+    "description": "MyTools: Central dispatcher -- run any framework command as `mt <name>`",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_aliases",
+    "command": "mt-aliases",
+    "description": "MyTools: List all documented shell aliases (shortcut for `mt-list --alias`)",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_cat",
+    "command": "mt-cat",
+    "description": "MyTools: List all tools within a specific category (shortcut for `mt-list <category>`)",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_cats",
+    "command": "mt-cats",
+    "description": "MyTools: List all available command categories (shortcut for `mt-list`)",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_config",
+    "command": "mt-config",
+    "description": "MyTools: Display active framework configuration variables",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_dump",
+    "command": "mt-dump",
+    "description": "MyTools: Generate a detailed technical Markdown dump of all functions and aliases",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_funcs",
+    "command": "mt-funcs",
+    "description": "MyTools: List all documented shell functions (shortcut for `mt-list --func`)",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_fzf",
+    "command": "mt-fzf",
+    "description": "MyTools: Interactive fuzzy-finder to search for a command",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_get_version",
+    "command": "mt-get-version",
+    "description": "System: Print the current local version of the terminal profile",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_help",
+    "command": "mt-help",
+    "description": "MyTools: Display detailed help and source code for a command",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_list",
+    "command": "mt-list",
+    "description": "MyTools: List all available command categories",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_lookup",
+    "command": "mt-lookup",
+    "description": "MyTools: Search through available mytools commands with tab-completion",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_refresh_caches",
+    "command": "mt-refresh-caches",
+    "description": "System: Forcefully clear and rebuild all background caches (.env, mytools, updates)",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_run",
+    "command": "mt-run",
+    "description": "MyTools: Interactive fuzzy-finder to select and execute a command",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_status",
+    "command": "mt-status",
+    "description": "System: Display a unified health check and status dashboard",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mytools",
+    "command": "mytools",
+    "description": "MyTools: Primary runner and documentation index",
+    "category": "MyTools Documentation & Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_speedtest",
+    "command": "mt-speedtest",
+    "description": "Networking: Run an internet speed test via the Ookla Speedtest CLI,",
+    "category": "Networking: Speed Test Utility"
+  },
+  {
+    "id": "mtDevops.catalog.cd_ai_workspace",
+    "command": "cd-ai-workspace",
+    "description": "AI: Change directory to unified AI workspace",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.cd_win_docker",
+    "command": "cd-win-docker",
+    "description": "Docker: Change to Docker directory (from config.yaml) and open in Windows Explorer",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.ide",
+    "command": "ide",
+    "description": "System: Open current directory in the default IDE (VSCode/IntelliJ)",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.mt_dotfiles",
+    "command": "mt-dotfiles",
+    "description": "System: Change directory to dotfiles repository root",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.mt_open_homepage",
+    "command": "mt-open-homepage",
+    "description": "System: Open dotfiles repository remote URL in default web browser",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.win_ai_workspace",
+    "command": "win-ai-workspace",
+    "description": "AI: Open unified AI workspace in the platform's native file manager (shortcut for `win ai`)",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.win_docker",
+    "command": "win-docker",
+    "description": "Docker: Open Docker root directory in the platform's native file manager (shortcut for `win docker`)",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.win_sync",
+    "command": "win-sync",
+    "description": "System: Open sync repository in the platform's native file manager (shortcut for `win sync`)",
+    "category": "Path & URL Launchers (Config-Driven)"
+  },
+  {
+    "id": "mtDevops.catalog.mt_apply",
+    "command": "mt-apply",
+    "description": "System: Safely execute or write clipboard code without terminal paste truncation",
+    "category": "Private Aliases (local-only -- never synced to the framework repo)"
+  },
+  {
+    "id": "mtDevops.catalog.mt_cmd_history",
+    "command": "mt-cmd-history",
+    "description": "System: Display history of executed framework commands",
+    "category": "Private Aliases (local-only -- never synced to the framework repo)"
+  },
+  {
+    "id": "mtDevops.catalog.mt_add_bitbucket_secret",
+    "command": "mt-add-bitbucket-secret",
+    "description": "System: Interactively add or update your Bitbucket API token, paired",
+    "category": "Secrets Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_add_claude_key",
+    "command": "mt-add-claude-key",
+    "description": "AI: Interactively add or update your Claude API key",
+    "category": "Secrets Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_add_dockerhub_secret",
+    "command": "mt-add-dockerhub-secret",
+    "description": "System: Interactively add or update your Docker Hub credentials,",
+    "category": "Secrets Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_add_gemini_key",
+    "command": "mt-add-gemini-key",
+    "description": "AI: Interactively add or update your Gemini API key",
+    "category": "Secrets Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_secrets",
+    "command": "mt-secrets",
+    "description": "System: Interactive menu for managing the framework's supported",
+    "category": "Secrets Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_doctor",
+    "command": "mt-doctor",
+    "description": "System: Diagnostic health-check for the framework's environment --",
+    "category": "System Diagnostics (\"mt-doctor\")"
+  },
+  {
+    "id": "mtDevops.catalog.bootstrap",
+    "command": "bootstrap",
+    "description": "System: Bootstrap missing dependencies (Debian/WSL via APT, macOS via Homebrew)",
+    "category": "System & Environment Bootstrap"
+  },
+  {
+    "id": "mtDevops.catalog.sys_install",
+    "command": "sys-install",
+    "description": "System: Updates system packages and clears pending-update marker",
+    "category": "System & Environment Bootstrap"
+  },
+  {
+    "id": "mtDevops.catalog.sys_update",
+    "command": "sys-update",
+    "description": "System: Updates system packages (APT on Debian/WSL, Homebrew on macOS)",
+    "category": "System & Environment Bootstrap"
+  },
+  {
+    "id": "mtDevops.catalog.mt_menu",
+    "command": "mt-menu",
+    "description": "System: Launch the interactive master router for the entire framework.",
+    "category": "System: Interactive Master Menu"
+  },
+  {
+    "id": "mtDevops.catalog.clip",
+    "command": "clip",
+    "description": "System: Pipe output to the system clipboard (e.g. cat file \\| clip)",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.win",
+    "command": "win",
+    "description": "System: Open a directory in the platform's native file manager",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.win_export",
+    "command": "win-export",
+    "description": "System: Open ~/vcs/personal/exports in the platform's native file manager (shortcut for `win export`)",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.win_vcs",
+    "command": "win-vcs",
+    "description": "System: Open ~/vcs in the platform's native file manager (shortcut for `win vcs`)",
+    "category": "System & Navigation Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.mt_uninstall",
+    "command": "mt-uninstall",
+    "description": "System: Completely remove the MT DevOps Framework from this machine --",
+    "category": "System Uninstaller (\"mt-uninstall\")"
+  },
+  {
+    "id": "mtDevops.catalog.tf_ai_iam",
+    "command": "tf-ai-iam",
+    "description": "AI: Analyze Terraform codebase for IAM requirements and optionally generate script",
+    "category": "Terraform & AI Integrations"
+  },
+  {
+    "id": "mtDevops.catalog.tf_iam",
+    "command": "tf-iam",
+    "description": "AI: Analyze Terraform codebase for IAM requirements and optionally generate script (Alias for tf-ai-iam)",
+    "category": "Terraform & AI Integrations"
+  },
+  {
+    "id": "mtDevops.catalog.tf_clean",
+    "command": "tf-clean",
+    "description": "Terraform: Aggressively clean local caching (.terraform, locks, plans)",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tf_replace",
+    "command": "tf-replace",
+    "description": "Terraform: Replace a specific resource (Modern alternative to taint)",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.tf_yaml",
+    "command": "tf-yaml",
+    "description": "Terraform: Execute Terraform using a YAML config file for variables",
+    "category": "Terraform Aliases"
+  },
+  {
+    "id": "mtDevops.catalog.terraform",
+    "command": "terraform",
+    "description": "Terraform: Core wrapper (preserves args)",
+    "category": "Terraform & Kubernetes Wrappers"
+  },
+  {
+    "id": "mtDevops.catalog.mt_jobs",
+    "command": "mt-jobs",
+    "description": "System: List and manage MT background jobs",
+    "category": "Utilities: Background Job Registry"
+  },
+  {
+    "id": "mtDevops.catalog.mt_backup",
+    "command": "mt-backup",
+    "description": "System: Create an archive backup of the current directory",
+    "category": "Utilities: Backup & Restore"
+  },
+  {
+    "id": "mtDevops.catalog.mt_restore",
+    "command": "mt-restore",
+    "description": "System: Restore framework from a zip backup",
+    "category": "Utilities: Backup & Restore"
+  },
+  {
+    "id": "mtDevops.catalog.mt_log",
+    "command": "mt-log",
+    "description": "System: Centralized logging for MyTools",
+    "category": "Utilities: Centralized Framework Logging"
+  },
+  {
+    "id": "mtDevops.catalog.mt_logs",
+    "command": "mt-logs",
+    "description": "System: View, filter, and manage framework logs",
+    "category": "Utilities: Centralized Framework Logging"
+  },
+  {
+    "id": "mtDevops.catalog.mt_http_server",
+    "command": "mt-http-server",
+    "description": "System: Host the current directory over a temporary HTTP server. Only",
+    "category": "Utilities: Temporary HTTP File Server"
+  },
+  {
+    "id": "mtDevops.catalog.mt_serve",
+    "command": "mt-serve",
+    "description": "Utilities: Host the current directory over a temporary HTTP server",
+    "category": "Utilities: Temporary HTTP File Server"
+  },
+  {
+    "id": "mtDevops.catalog.mt_server_manager",
+    "command": "mt-server-manager",
+    "description": "Utilities: Interactive menu to manage the single mt-http-server",
+    "category": "Utilities: Temporary HTTP File Server"
+  },
+  {
+    "id": "mtDevops.catalog.git_ai_push_all",
+    "command": "git-ai-push-all",
+    "description": "Git: Auto-format, stage, generate AI commits, and push all changes",
+    "category": "Version Control (Git) - AI Workflows"
+  },
+  {
+    "id": "mtDevops.catalog.mt_ai_gitignore",
+    "command": "mt-ai-gitignore",
+    "description": "AI: Generate a comprehensive .gitignore for the active repository",
+    "category": "Version Control (Git) - AI Workflows"
+  },
+  {
+    "id": "mtDevops.catalog.mt_ai_readme",
+    "command": "mt-ai-readme",
+    "description": "AI: Generate a comprehensive README.md for the active repository",
+    "category": "Version Control (Git) - AI Workflows"
+  },
+  {
+    "id": "mtDevops.catalog.cd_repo_root",
+    "command": "cd-repo-root",
+    "description": "Git: Change directory to the current repository's top-level root,",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_clean_merged",
+    "command": "git-clean-merged",
+    "description": "Git: Delete local and remote branches merged into the default branch",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_create_repo",
+    "command": "git-create-repo",
+    "description": "Git: Create a new GitHub repository for the current directory and wire",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_default_rebase",
+    "command": "git-default-rebase",
+    "description": "Git: Fetch upstream origin and rebase current branch onto default branch",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_new_feature",
+    "command": "git-new-feature",
+    "description": "Git: Create and checkout a new feature branch",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_nuke",
+    "command": "git-nuke",
+    "description": "Git: Hard reset local branch to upstream state and wipe untracked files",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_pretty_log",
+    "command": "git-pretty-log",
+    "description": "Git: Print a clean, color-coded, single-line log graph",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_push_all",
+    "command": "git-push-all",
+    "description": "Git: Stage all files, commit with provided message, and push",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_raise_pr",
+    "command": "git-raise-pr",
+    "description": "Git: Push current branch and raise a Pull Request (GitHub/GitLab/Bitbucket)",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_view_remote",
+    "command": "git-view-remote",
+    "description": "Git: Open current repository remote URL in default web browser",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.mt_git_clone",
+    "command": "mt-git-clone",
+    "description": "Git: Clone a repository into a sensibly routed default location",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.mt_repos",
+    "command": "mt-repos",
+    "description": "Git: Scan VCS root and list all local repositories, optionally",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.mt_download_release",
+    "command": "mt-download-release",
+    "description": "System: Download a release zip from the remote repository",
+    "category": "Version Control (Git) - Profile Synchronization"
+  },
+  {
+    "id": "mtDevops.catalog.mt_get_update",
+    "command": "mt-get-update",
+    "description": "System: Download and install profile updates from GitHub releases --",
+    "category": "Version Control (Git) - Profile Synchronization"
+  },
+  {
+    "id": "mtDevops.catalog.mt_migrate_symlink",
+    "command": "mt-migrate-symlink",
+    "description": "Git: One-time, idempotent cutover that replaces ~/.bash.d as a",
+    "category": "Version Control (Git) - Profile Synchronization"
+  },
+  {
+    "id": "mtDevops.catalog.mt_push_update",
+    "command": "mt-push-update",
+    "description": "System: Sync local bash configs to terminal dotfiles repo and create a Pull Request",
+    "category": "Version Control (Git) - Profile Synchronization"
+  },
+  {
+    "id": "mtDevops.catalog.mt_suggest",
+    "command": "mt-suggest",
+    "description": "System: Quickly file a lightweight \"workflow gap\" issue against the",
+    "category": "Workflow Gap / Backlog Capture"
+  }
+]

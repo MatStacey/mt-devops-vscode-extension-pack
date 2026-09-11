@@ -1,7 +1,7 @@
 # VSCode Extension Packs
 
-This repository hosts two curated Visual Studio Code extension packs,
-built and released independently:
+This repository hosts three Visual Studio Code extensions/packs, built
+and released independently:
 
 * **[MT DevOps Framework VSCode Extension Pack](packages/mt-devops-vscode-extension-pack/README.md)**
   — the full pack, including Atlassian/Bitbucket (Atlascode) and Google
@@ -10,6 +10,9 @@ built and released independently:
 * **[Generic Dev Extension Pack](packages/generic-dev-extension-pack/README.md)**
   — the same general-purpose development tooling with the Atlassian,
   Bitbucket, and Google Cloud specific extensions stripped out.
+* **[MT DevOps Framework Companion](packages/mt-devops-companion/README.md)**
+  — a real (coded, not just a manifest) extension that gives command-palette
+  access to the MT DevOps Framework's full `mt-` command catalog.
 
-See each package's own README for its included extensions, prerequisites,
-and install instructions.
+See each package's own README for its included extensions/features,
+prerequisites, and install instructions.
