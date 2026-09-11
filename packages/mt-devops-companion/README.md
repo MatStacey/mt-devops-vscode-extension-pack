@@ -8,10 +8,20 @@ This is a thin client: it never reimplements framework logic. Every command it r
 
 * **`MT DevOps: Run Command...`** -- fuzzy-searches the framework's entire command catalog (aliases and functions, generated from the framework's own `COMMANDS.md`) and runs your selection in a reused "MT DevOps" integrated terminal.
 * **`MT DevOps: Show Status Dashboard`** -- shortcut for `mt-status`, the framework's health-check dashboard.
+* **MT DevOps activity bar view**, with seven panels:
+  * **Jobs** -- the background job registry (`mt-jobs`), live-updated; click a finished job to open its log.
+  * **Repo Hub** -- `mt-hub`'s own AI/heuristic dashboard of every repo under `VCS_ROOT`; click a repo to open it.
+  * **Secrets** -- status only (created/expiry/last-used dates, colour-coded expired/expiring/active) -- never reads the actual secret values.
+  * **Status** -- `mt-status`, structured into Framework / Sync Repo / Docker / Updates.
+  * **Doctor** -- `mt-doctor`'s checks, grouped by section with pass/warn/fail icons.
+  * **Docker** -- running/stopped containers (`docker-ls`).
+  * **Kubernetes** -- active context plus every pod in the current namespace (`k8s-status`/`k8s-pods`).
+
+  Jobs, Repo Hub, and Secrets update live as their underlying files change. Status, Doctor, Docker, and Kubernetes are refreshed on demand (the refresh button in each view's title bar), since each refresh is a real shell invocation rather than a file read.
 
 ## Requirements
 
-The [MT DevOps Framework](https://github.com/MatStacey/mt-devops-framework) must be installed and loaded into your interactive shell (`~/.bash.d`). Commands are run via VS Code's integrated terminal, which sources your shell profile the same way a regular terminal tab would.
+The [MT DevOps Framework](https://github.com/MatStacey/mt-devops-framework) must be installed and loaded into your interactive shell (`~/.bash.d`). Commands are run via VS Code's integrated terminal, which sources your shell profile the same way a regular terminal tab would. The tree views shell out to a genuinely interactive `bash -ic` for the same reason (a plain `bash -c`/`bash -lc` never loads the framework at all, since `~/.bashrc` itself is guarded to only run interactively).
 
 ## Keeping the command catalog current
 
