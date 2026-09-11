@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { marked } from "marked";
+import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
 import type { RepoMeta } from "./repoHubProvider";
 
@@ -112,6 +113,20 @@ async function readLocalBranches(repoPath: string): Promise<Set<string>> {
   return new Set(output ? output.split("\n") : []);
 }
 
+/**
+ * Whether a branch name is safe to pass as a git refspec argument --
+ * rejects anything starting with "-" (which git/getopt would otherwise
+ * parse as a flag, e.g. a branch named "--upload-pack=..." smuggling
+ * arbitrary command execution into `git fetch`) plus whitespace,
+ * shell/refspec metacharacters, and other control characters. This is
+ * intentionally conservative (real git branch names are already far
+ * more permissive) since the only cost of a false rejection here is
+ * refusing to fetch, not a security gap.
+ */
+function isSafeBranchName(name: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9/_.-]*$/.test(name);
+}
+
 /** Remote-tracking branch names under origin/, with the "origin/" prefix stripped and origin/HEAD excluded. */
 async function readRemoteBranches(repoPath: string): Promise<string[]> {
   const output = await runGit(repoPath, ["branch", "-r", "--format=%(refname:short)"]);
@@ -119,7 +134,7 @@ async function readRemoteBranches(repoPath: string): Promise<string[]> {
   return output
     .split("\n")
     .map((line) => line.replace(/^origin\//, ""))
-    .filter((name) => name && name !== "HEAD");
+    .filter((name) => name && name !== "HEAD" && isSafeBranchName(name));
 }
 
 /** How many commits the current branch is behind its upstream, or 0 if there's no upstream (e.g. a detached HEAD or a branch never pushed). */
@@ -135,6 +150,42 @@ function findReadme(repoPath: string): string | null {
   return readme ? path.join(repoPath, readme) : null;
 }
 
+/** Only these URL schemes (plus scheme-relative/relative paths) are allowed in a README's rendered links/images; anything else (e.g. "javascript:") is replaced with "#" rather than passed through. */
+function sanitizeHref(href: string): string {
+  if (/^(https?:|mailto:)/i.test(href)) return href;
+  if (/^[/#.]/.test(href)) return href;
+  return "#";
+}
+
+/**
+ * A `marked` renderer that closes the two XSS routes raw README content
+ * could otherwise open in this webview: raw HTML passthrough (marked's
+ * default `html` renderer emits it completely unescaped) is instead
+ * escaped to literal text, and link/image URLs are restricted to a
+ * scheme allowlist so a `[x](javascript:...)` link can't execute script
+ * when clicked. The CSP's `script-src 'nonce-...'` already blocks a
+ * plain injected `<script>` tag, but neither event-handler attributes
+ * nor `javascript:` URIs are reliably covered by CSP the same way, so
+ * this is the actual enforcement point for those.
+ */
+const safeRenderer = new Renderer();
+safeRenderer.html = ({ text }) => escapeHtml(text);
+// `function` (not an arrow) so marked's own call-site binds `this` to the
+// renderer instance, giving access to `this.parser.parseInline` the same
+// way the default link renderer does -- an arrow function here would
+// silently lose that binding.
+safeRenderer.link = function (this: Renderer, { href, title, tokens }) {
+  const text = this.parser.parseInline(tokens);
+  const safeHref = sanitizeHref(href);
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<a href="${escapeHtml(safeHref)}"${titleAttr}>${text}</a>`;
+};
+safeRenderer.image = ({ href, title, text }) => {
+  const safeHref = sanitizeHref(href);
+  const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<img src="${escapeHtml(safeHref)}" alt="${escapeHtml(text)}"${titleAttr}>`;
+};
+
 async function renderReadme(repoPath: string): Promise<string | null> {
   const readmePath = findReadme(repoPath);
   if (!readmePath) return null;
@@ -142,7 +193,7 @@ async function renderReadme(repoPath: string): Promise<string | null> {
     const raw = await fs.promises.readFile(readmePath, "utf8");
     return path.extname(readmePath).toLowerCase() === ".txt"
       ? `<pre>${escapeHtml(raw)}</pre>`
-      : await marked.parse(raw);
+      : await marked.parse(raw, { renderer: safeRenderer });
   } catch {
     return null;
   }
@@ -307,9 +358,9 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
 </html>`;
 }
 
+/** A CSP nonce must be unpredictable to an attacker able to inject markup (e.g. via a crafted README) -- Math.random() is not cryptographically secure and was the actual weakness here, so this uses Node's CSPRNG instead. */
 function getNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  return Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return crypto.randomBytes(24).toString("base64");
 }
 
 let activePanel: vscode.WebviewPanel | undefined;
@@ -372,7 +423,16 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
         }
         if (message.command === "fetchBranch" && message.branch) {
           const branch = message.branch;
-          const stderr = await execGit(displayedRepoPath, ["fetch", "origin", `${branch}:${branch}`]);
+          if (!isSafeBranchName(branch)) {
+            vscode.window.showErrorMessage(`MT DevOps: refusing to fetch unsafe branch name "${branch}".`);
+            return;
+          }
+          // The trailing "--" stops git from treating a refspec that
+          // happens to start with "-" (e.g. a maliciously named remote
+          // branch like "--upload-pack=...") as an option instead of a
+          // positional argument -- isSafeBranchName rejects a leading
+          // "-" too, so this is defense in depth, not the only guard.
+          const stderr = await execGit(displayedRepoPath, ["fetch", "origin", "--", `${branch}:${branch}`]);
           if (stderr) vscode.window.showErrorMessage(`MT DevOps: fetch failed -- ${stderr}`);
           await refreshPanel();
         }
