@@ -18,7 +18,7 @@ This is a thin client: it never reimplements framework logic. Every command it r
   * **Kubernetes** -- active context plus every pod in the current namespace (`k8s-status`/`k8s-pods`).
 
   Jobs, Repo Hub, and Secrets update live as their underlying files change. Status, Doctor, Docker, and Kubernetes are refreshed on demand (the refresh button in each view's title bar), since each refresh is a real shell invocation rather than a file read.
-* **`@mtdevops` chat participant** -- ask it anything (`ai`), or use its slash commands: `/explain <command>` (`ai-explain`) and `/iam` (`tf-ai-iam`, analyzes the first open workspace folder). Note: `ai`'s code-generation replies save the generated code straight to a file and only summarize in chat -- this works best for direct Q&A, not inline code generation.
+* **`@mtdevops` chat participant** -- ask it anything (`ai`), or use its slash commands: `/explain <command>` (`ai-explain`) and `/iam` (`tf-ai-iam`, analyzes the first open workspace folder). When a reply is code that `ai` saved to a file (rather than a plain chat answer), the participant reads that file back and shows it inline in the chat too, with an "Open Generated File" button -- the file is still the source of truth (this is read-back, not a reimplementation of `ai`'s own save/categorize logic).
 * **Explorer right-click "MT DevOps: Copy for LLM"** -- runs `mt-copy` on the selected file or folder, copying it (with headers) to your clipboard.
 
 ## Requirements
