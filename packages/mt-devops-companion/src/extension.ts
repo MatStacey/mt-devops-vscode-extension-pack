@@ -10,6 +10,7 @@ import { KubernetesProvider } from "./kubernetesProvider";
 import { RepoCategoryItem, RepoHubProvider, RepoTreeItem } from "./repoHubProvider";
 import { showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
+import { SettingsValueItem, SettingsProvider } from "./settingsProvider";
 import { StatusProvider } from "./statusProvider";
 
 interface CatalogEntry {
@@ -200,6 +201,46 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await runAndNotify(`mt-secrets --delete ${shellQuote(item.name)}`, "MT DevOps: delete failed");
     }),
 
+    // Settings: edits go straight through config_manager.py's own
+    // "update <section> <key> <value>" (the same write path every
+    // mt-set-*/mt-toggle-* command uses) rather than hand-editing
+    // config.yaml here -- keeps validation, the .env.cache invalidation,
+    // and permissions (chmod 600) all in one place. A boolean setting
+    // gets a true/false picker so it can't be typo'd into a truthy-looking
+    // string; everything else is a plain input box pre-filled with its
+    // current value.
+    vscode.commands.registerCommand("mtDevops.editConfigValue", async (item: SettingsValueItem) => {
+      const segments = item.dotPath.split(".");
+      const key = segments.pop();
+      const sectionPath = segments.join(".");
+      if (!key || !sectionPath) {
+        vscode.window.showErrorMessage(`MT DevOps: "${item.dotPath}" isn't an editable setting.`);
+        return;
+      }
+
+      let newValue: string | undefined;
+      if (typeof item.value === "boolean") {
+        newValue = await vscode.window.showQuickPick(["true", "false"], {
+          placeHolder: `Current value: ${item.value}`,
+        });
+      } else {
+        newValue = await vscode.window.showInputBox({
+          prompt: `${item.dotPath}`,
+          value: String(item.value),
+        });
+      }
+      if (newValue === undefined) return;
+
+      // newValue is free-typed user input -- shellQuote() everywhere it
+      // reaches the shell string, including here, rather than only on
+      // the update call itself (an unquoted second use would reopen the
+      // same shell-injection hole via the confirmation echo).
+      await runAndNotify(
+        `python3 "$CONFIG_MANAGER" update ${shellQuote(sectionPath)} ${shellQuote(key)} ${shellQuote(newValue)} && echo ${shellQuote(`✅ ${item.dotPath} set to ${newValue}.`)}`,
+        "MT DevOps: setting update failed",
+      );
+    }),
+
     // Repo Hub: click opens the report webview (registered below via
     // repoHubProvider.ts's own tree-item command); right-click offers
     // "Open in VS Code" plus per-repo/per-category index & update.
@@ -268,6 +309,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       path.join(configDir, "secrets_metadata.yaml"),
       new SecretsProvider(),
       "mtDevops.refreshSecrets",
+    );
+    registerWatchedView(
+      context,
+      "mtDevopsSettings",
+      path.join(configDir, "config.yaml"),
+      new SettingsProvider(path.join(configDir, "config.yaml")),
+      "mtDevops.refreshSettings",
     );
   } catch (err) {
     vscode.window.showWarningMessage(

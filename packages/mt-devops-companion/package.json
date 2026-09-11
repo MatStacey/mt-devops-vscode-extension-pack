@@ -48,6 +48,16 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "mtDevops.refreshSettings",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mtDevops.editConfigValue",
+        "title": "Edit Setting",
+        "icon": "$(edit)"
+      },
+      {
         "command": "mtDevops.refreshStatus",
         "title": "Refresh",
         "icon": "$(refresh)"
@@ -186,6 +196,10 @@
           "name": "Secrets"
         },
         {
+          "id": "mtDevopsSettings",
+          "name": "Settings"
+        },
+        {
           "id": "mtDevopsStatus",
           "name": "Status"
         },
@@ -247,6 +261,11 @@
         {
           "command": "mtDevops.refreshSecrets",
           "when": "view == mtDevopsSecrets",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.refreshSettings",
+          "when": "view == mtDevopsSettings",
           "group": "navigation"
         },
         {
@@ -360,6 +379,11 @@
           "command": "mtDevops.secretDelete",
           "when": "view == mtDevopsSecrets && viewItem == mtDevopsSecret-configured",
           "group": "1_manage@2"
+        },
+        {
+          "command": "mtDevops.editConfigValue",
+          "when": "view == mtDevopsSettings && viewItem == mtDevopsSettingsValue",
+          "group": "1_manage@1"
         }
       ]
     }
@@ -372,9 +396,11 @@
     "sync-commands": "node scripts/generate-commands.mjs"
   },
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.0",
     "@types/vscode": "^1.93.0",
     "esbuild": "^0.23.1",
+    "js-yaml": "^5.4.1",
     "typescript": "^5.5.4"
   },
   "dependencies": {
