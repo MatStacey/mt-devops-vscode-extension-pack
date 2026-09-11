@@ -23,15 +23,17 @@ const END_MARKER = "@@MT_DEVOPS_OUTPUT_END@@";
  * output -- so the real payload is wrapped in sentinel markers and
  * extracted between them, rather than trusting stdout to be clean.
  *
- * `scriptBody` must always be a fixed literal written in this
- * extension's own source (e.g. "mt-status --json") -- never a string
- * built from user input or a QuickPick selection. execFile passes it
- * as a single argv element to `bash -ic`, not through an outer shell,
- * so there's no argv-splitting/injection surface from this call itself;
- * the trust boundary is simply that bash -ic interprets its own -c
- * argument as a script by design.
+ * `scriptBody` is either a fixed literal written in this extension's
+ * own source (e.g. "mt-status --json"), or one built with shellQuote()
+ * around any dynamic/user-supplied piece (e.g. a chat prompt) -- never
+ * raw string concatenation of untrusted input. execFile passes the
+ * whole body as a single argv element to `bash -ic`, not through an
+ * outer shell, so there's no argv-splitting surface from this call
+ * itself; the trust boundary is simply that bash -ic interprets its
+ * own -c argument as a script by design, so anything dynamic inside it
+ * must be shell-quoted first.
  */
-function runInteractiveShell(scriptBody: string): Promise<string> {
+export function runInteractiveShell(scriptBody: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const wrapped = `echo "${START_MARKER}"; ${scriptBody}; echo "${END_MARKER}"`;
     execFile("/bin/bash", ["-ic", wrapped], { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
@@ -82,8 +84,25 @@ export async function runFrameworkJson<T = unknown>(command: string): Promise<T>
     // path instead of JSON when a precondition isn't met -- surface
     // that real reason, stripped of ANSI codes, rather than a generic
     // parse-failure message.
-    // eslint-disable-next-line no-control-regex
-    const stripped = output.replace(/\x1b\[[0-9;]*m/g, "").trim();
+    const stripped = stripAnsi(output);
     throw new Error(stripped || `${command} did not return valid JSON.`);
   }
+}
+
+/** Strips ANSI color/style escape codes from text meant for a non-terminal UI surface (chat markdown, error messages). */
+export function stripAnsi(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+/**
+ * Safely embeds a value (e.g. free-typed chat text) inside a bash
+ * script string passed to runInteractiveShell -- wraps it in single
+ * quotes, escaping any embedded single quote the standard POSIX-shell
+ * way ('\''), so it's always treated as a single literal argument, even
+ * if it contains shell metacharacters. This is the one place genuinely
+ * untrusted (user-typed) input is allowed to reach a shell string.
+ */
+export function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }

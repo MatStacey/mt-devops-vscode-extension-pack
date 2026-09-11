@@ -1,9 +1,10 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
+import { registerAiChatParticipant } from "./aiChatParticipant";
 import { DoctorProvider } from "./doctorProvider";
 import { DockerProvider } from "./dockerProvider";
-import { resolveFrameworkPaths } from "./framework";
+import { resolveFrameworkPaths, shellQuote } from "./framework";
 import { JobsProvider } from "./jobsProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
 import { RepoHubProvider } from "./repoHubProvider";
@@ -111,7 +112,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand("mtDevops.runCommand", () => pickAndRunCommand(catalog)),
     vscode.commands.registerCommand("mtDevops.showStatus", () => runInTerminal("mt-status")),
+    vscode.commands.registerCommand("mtDevops.copyForLLM", (uri: vscode.Uri | undefined) => {
+      const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+      if (!target) {
+        vscode.window.showWarningMessage("MT DevOps: select a file or folder first.");
+        return;
+      }
+      runInTerminal(`mt-copy ${shellQuote(target.fsPath)}`);
+    }),
   );
+
+  registerAiChatParticipant(context);
 
   registerAsyncView(context, "mtDevopsStatus", new StatusProvider(), "mtDevops.refreshStatus");
   registerAsyncView(context, "mtDevopsDoctor", new DoctorProvider(), "mtDevops.refreshDoctor");

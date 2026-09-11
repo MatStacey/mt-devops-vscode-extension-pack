@@ -11,7 +11,7 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.93.0"
   },
   "categories": [
     "Other"
@@ -27,6 +27,10 @@
       {
         "command": "mtDevops.showStatus",
         "title": "MT DevOps: Show Status Dashboard"
+      },
+      {
+        "command": "mtDevops.copyForLLM",
+        "title": "MT DevOps: Copy for LLM"
       },
       {
         "command": "mtDevops.refreshJobs",
@@ -105,7 +109,32 @@
         }
       ]
     },
+    "chatParticipants": [
+      {
+        "id": "mtdevops.ai",
+        "name": "mtdevops",
+        "fullName": "MT DevOps Framework",
+        "description": "Ask the framework's configured AI provider (ai), explain a command (ai-explain), or analyze this workspace's Terraform IAM needs (tf-ai-iam).",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "explain",
+            "description": "Explain a terminal command (ai-explain)"
+          },
+          {
+            "name": "iam",
+            "description": "Analyze this workspace's Terraform IAM requirements (tf-ai-iam)"
+          }
+        ]
+      }
+    ],
     "menus": {
+      "explorer/context": [
+        {
+          "command": "mtDevops.copyForLLM",
+          "group": "7_modification"
+        }
+      ],
       "view/title": [
         {
           "command": "mtDevops.refreshJobs",
@@ -155,7 +184,7 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.14.0",
-    "@types/vscode": "^1.80.0",
+    "@types/vscode": "^1.93.0",
     "esbuild": "^0.23.1",
     "js-yaml": "^4.1.0",
     "typescript": "^5.5.4"
