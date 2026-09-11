@@ -1,9 +1,29 @@
 import { execFile } from "node:child_process";
+import * as vscode from "vscode";
 
 export interface FrameworkPaths {
   cacheDir: string;
   configDir: string;
   logDir: string;
+  vcsRoot: string;
+}
+
+const TERMINAL_NAME = "MT DevOps";
+
+/**
+ * Runs a framework command in a persistent, reused "MT DevOps" terminal.
+ * Framework functions are interactive/colorized and expect a real shell
+ * (they source ~/.bashrc for everything from color variables to
+ * XDG-resolved paths), so a visible terminal -- not a captured
+ * child_process -- is the right execution model for anything long-running,
+ * genuinely interactive (docker exec, log tailing), or where the user
+ * benefits from watching live progress (bulk repo indexing).
+ */
+export function runInTerminal(command: string): void {
+  const existing = vscode.window.terminals.find((t) => t.name === TERMINAL_NAME);
+  const terminal = existing ?? vscode.window.createTerminal(TERMINAL_NAME);
+  terminal.show();
+  terminal.sendText(command);
 }
 
 const START_MARKER = "@@MT_DEVOPS_OUTPUT_START@@";
@@ -60,12 +80,14 @@ export function runInteractiveShell(scriptBody: string): Promise<string> {
  * framework itself considers "the" cache/config/log dirs.
  */
 export async function resolveFrameworkPaths(): Promise<FrameworkPaths> {
-  const output = await runInteractiveShell('printf "%s\\n%s\\n%s\\n" "$CACHE_DIR" "$CONFIG_DIR" "$LOG_DIR"');
-  const [cacheDir, configDir, logDir] = output.split("\n");
-  if (!cacheDir || !configDir || !logDir) {
-    throw new Error("Could not resolve CACHE_DIR/CONFIG_DIR/LOG_DIR from the shell profile.");
+  const output = await runInteractiveShell(
+    'printf "%s\\n%s\\n%s\\n%s\\n" "$CACHE_DIR" "$CONFIG_DIR" "$LOG_DIR" "${VCS_ROOT:-$HOME/vcs}"',
+  );
+  const [cacheDir, configDir, logDir, vcsRoot] = output.split("\n");
+  if (!cacheDir || !configDir || !logDir || !vcsRoot) {
+    throw new Error("Could not resolve CACHE_DIR/CONFIG_DIR/LOG_DIR/VCS_ROOT from the shell profile.");
   }
-  return { cacheDir, configDir, logDir };
+  return { cacheDir, configDir, logDir, vcsRoot };
 }
 
 /**

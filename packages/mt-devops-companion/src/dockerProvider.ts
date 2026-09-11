@@ -16,9 +16,13 @@ interface DockerContainer {
 const RUNNING_ICON = new vscode.ThemeIcon("play-circle", new vscode.ThemeColor("testing.iconPassed"));
 const STOPPED_ICON = new vscode.ThemeIcon("stop-circle", new vscode.ThemeColor("disabledForeground"));
 
-class DockerContainerItem extends vscode.TreeItem {
+export class DockerContainerItem extends vscode.TreeItem {
+  /** Container name -- what docker's own CLI (start/stop/restart/exec/logs) accepts as a target, same as the Names column shown here. */
+  readonly containerName: string;
+
   constructor(container: DockerContainer) {
     super(container.Names, vscode.TreeItemCollapsibleState.None);
+    this.containerName = container.Names;
     this.description = container.Status;
     this.iconPath = container.State === "running" ? RUNNING_ICON : STOPPED_ICON;
     this.tooltip = new vscode.MarkdownString(
@@ -28,7 +32,11 @@ class DockerContainerItem extends vscode.TreeItem {
         `- Ports: ${container.Ports || "none"}\n` +
         `- Running for: ${container.RunningFor}`,
     );
-    this.contextValue = "mtDevopsContainer";
+    // Suffixed with the container's running/stopped state so package.json's
+    // view/item/context menu can show Start only for a stopped container and
+    // Stop/Restart/Shell only for a running one -- the same adaptive action
+    // set docker-containers' own interactive console already applies.
+    this.contextValue = container.State === "running" ? "mtDevopsContainer-running" : "mtDevopsContainer-stopped";
   }
 }
 

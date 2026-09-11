@@ -3,11 +3,12 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { registerAiChatParticipant } from "./aiChatParticipant";
 import { DoctorProvider } from "./doctorProvider";
-import { DockerProvider } from "./dockerProvider";
-import { resolveFrameworkPaths, shellQuote } from "./framework";
-import { JobsProvider } from "./jobsProvider";
+import { DockerContainerItem, DockerProvider } from "./dockerProvider";
+import { resolveFrameworkPaths, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
+import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
-import { RepoHubProvider } from "./repoHubProvider";
+import { RepoCategoryItem, RepoHubProvider, RepoTreeItem } from "./repoHubProvider";
+import { showRepoReport } from "./repoReportPanel";
 import { SecretsProvider } from "./secretsProvider";
 import { StatusProvider } from "./statusProvider";
 
@@ -17,8 +18,6 @@ interface CatalogEntry {
   description: string;
   category: string;
 }
-
-const TERMINAL_NAME = "MT DevOps";
 
 /**
  * Loads the generated command catalog shipped with the extension (see
@@ -33,17 +32,21 @@ function loadCatalog(extensionUri: vscode.Uri): CatalogEntry[] {
 }
 
 /**
- * Runs a framework command in a persistent, reused "MT DevOps" terminal.
- * Framework functions are interactive/colorized and expect a real shell
- * (they source ~/.bashrc for everything from color variables to
- * XDG-resolved paths), so a visible terminal -- not a captured
- * child_process -- is the right execution model for this first pass.
+ * Runs a quick, non-interactive mt-jobs/mt-hub mutation (job
+ * restart/stop/remove) via a captured shell call rather than a visible
+ * terminal -- these finish in well under a second and their own
+ * tree view already auto-refreshes from a file watcher once the
+ * underlying cache/registry file changes, so a toast with the result is
+ * enough feedback without a terminal tab appearing for a one-line action.
  */
-function runInTerminal(command: string): void {
-  const existing = vscode.window.terminals.find((t) => t.name === TERMINAL_NAME);
-  const terminal = existing ?? vscode.window.createTerminal(TERMINAL_NAME);
-  terminal.show();
-  terminal.sendText(command);
+async function runAndNotify(command: string, failurePrefix: string): Promise<void> {
+  try {
+    const output = await runInteractiveShell(command);
+    const plain = stripAnsi(output).trim();
+    if (plain) vscode.window.showInformationMessage(plain);
+  } catch (err) {
+    vscode.window.showErrorMessage(`${failurePrefix}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 async function pickAndRunCommand(catalog: CatalogEntry[]): Promise<void> {
@@ -120,6 +123,85 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       runInTerminal(`mt-copy ${shellQuote(target.fsPath)}`);
     }),
+
+    // Docker: single-container actions from the sidebar's context menu.
+    // Start/stop/restart shell out to the framework's own
+    // __docker_container_* helpers (30-docker.sh) -- the exact same ones
+    // docker-containers' interactive console calls per-container -- so
+    // messaging and behavior stay identical to running them by hand.
+    // Logs/shell need a real attached TTY (docker logs -f / exec -it),
+    // so those run in the terminal directly rather than a captured shell.
+    vscode.commands.registerCommand("mtDevops.dockerStart", (item: DockerContainerItem) =>
+      runInTerminal(`__docker_container_start ${shellQuote(item.containerName)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.dockerStop", (item: DockerContainerItem) =>
+      runInTerminal(`__docker_container_stop ${shellQuote(item.containerName)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.dockerRestart", (item: DockerContainerItem) =>
+      runInTerminal(`__docker_container_restart ${shellQuote(item.containerName)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.dockerLogs", (item: DockerContainerItem) =>
+      runInTerminal(`__docker_container_logs ${shellQuote(item.containerName)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.dockerShell", (item: DockerContainerItem) =>
+      runInTerminal(`__docker_container_shell ${shellQuote(item.containerName)}`),
+    ),
+
+    // Jobs: per-job actions plus a bulk "clear finished" -- restart/stop/
+    // remove are fast, one-shot mt-jobs mutations (see the framework's
+    // --restart/--stop/--remove flags), so they run captured rather than
+    // in a terminal, with the result shown as a toast. The Jobs tree
+    // already watches .mt_jobs.tsv for changes and refreshes itself once
+    // any of these commands rewrites it -- no manual refresh needed here.
+    vscode.commands.registerCommand("mtDevops.jobRestart", (item: JobTreeItem) =>
+      runAndNotify(`mt-jobs --restart ${shellQuote(item.jobId)}`, "MT DevOps: restart failed"),
+    ),
+    vscode.commands.registerCommand("mtDevops.jobStop", (item: JobTreeItem) =>
+      runAndNotify(`mt-jobs --stop ${shellQuote(item.jobId)}`, "MT DevOps: stop failed"),
+    ),
+    vscode.commands.registerCommand("mtDevops.jobRemove", (item: JobTreeItem) =>
+      runAndNotify(`mt-jobs --remove ${shellQuote(item.jobId)}`, "MT DevOps: remove failed"),
+    ),
+    vscode.commands.registerCommand("mtDevops.jobsClearFinished", () =>
+      runAndNotify("mt-jobs --clean", "MT DevOps: clear failed"),
+    ),
+
+    // Repo Hub: click opens the report webview (registered below via
+    // repoHubProvider.ts's own tree-item command); right-click offers
+    // "Open in VS Code" plus per-repo/per-category index & update.
+    // Index/update shell out to mt-hub --index, which can take a while
+    // (an AI call per un-cached or gapped repo) -- run visibly in the
+    // terminal so progress is watchable, same reasoning as bulk repo
+    // scans elsewhere in this extension. The Repo Hub tree already
+    // watches .vcs_hub.json, so it refreshes itself once mt-hub writes
+    // the updated cache -- no manual refresh needed here either.
+    vscode.commands.registerCommand("mtDevops.showRepoReport", (item: RepoTreeItem) =>
+      showRepoReport(item.repoPath, item.meta),
+    ),
+    vscode.commands.registerCommand("mtDevops.openRepoInVSCode", (item: RepoTreeItem) =>
+      vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.repoPath), { forceNewWindow: true }),
+    ),
+    vscode.commands.registerCommand("mtDevops.indexRepo", (item: RepoTreeItem) =>
+      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(item.repoPath))}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.updateRepo", (item: RepoTreeItem) =>
+      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(item.repoPath))}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.indexCategory", (item: RepoCategoryItem) =>
+      runInTerminal(`mt-hub --index -f -t ${shellQuote(item.category)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.updateCategory", (item: RepoCategoryItem) =>
+      runInTerminal(`mt-hub --index -u -t ${shellQuote(item.category)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.indexAllRepos", async () => {
+      const choice = await vscode.window.showWarningMessage(
+        "Force-reindex every repo under VCS_ROOT? This re-runs AI summarization for all of them, not just gapped ones.",
+        { modal: true },
+        "Index All",
+      );
+      if (choice === "Index All") runInTerminal("mt-hub --index -f");
+    }),
+    vscode.commands.registerCommand("mtDevops.updateAllRepos", () => runInTerminal("mt-hub --index -u")),
   );
 
   registerAiChatParticipant(context);
@@ -130,7 +212,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerAsyncView(context, "mtDevopsKubernetes", new KubernetesProvider(), "mtDevops.refreshKubernetes");
 
   try {
-    const { cacheDir, configDir } = await resolveFrameworkPaths();
+    const { cacheDir, configDir, vcsRoot } = await resolveFrameworkPaths();
 
     registerWatchedView(
       context,
@@ -143,7 +225,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       context,
       "mtDevopsRepoHub",
       path.join(cacheDir, ".vcs_hub.json"),
-      new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json")),
+      new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json"), vcsRoot),
       "mtDevops.refreshRepoHub",
     );
     registerWatchedView(

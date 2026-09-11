@@ -66,6 +66,86 @@
         "command": "mtDevops.refreshKubernetes",
         "title": "Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "mtDevops.dockerStart",
+        "title": "Start Container",
+        "icon": "$(play)"
+      },
+      {
+        "command": "mtDevops.dockerStop",
+        "title": "Stop Container",
+        "icon": "$(stop-circle)"
+      },
+      {
+        "command": "mtDevops.dockerRestart",
+        "title": "Restart Container",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mtDevops.dockerLogs",
+        "title": "Tail Logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "mtDevops.dockerShell",
+        "title": "Open Shell (SSH)",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "mtDevops.jobRestart",
+        "title": "Re-run Job",
+        "icon": "$(debug-rerun)"
+      },
+      {
+        "command": "mtDevops.jobStop",
+        "title": "Stop Job",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "mtDevops.jobRemove",
+        "title": "Remove from History",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "mtDevops.jobsClearFinished",
+        "title": "Clear Completed/Failed",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "mtDevops.openRepoInVSCode",
+        "title": "Open in VS Code",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "mtDevops.indexRepo",
+        "title": "Index This Repo",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mtDevops.updateRepo",
+        "title": "Update This Repo (fill gaps only)",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "mtDevops.indexCategory",
+        "title": "Index All in Category",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mtDevops.updateCategory",
+        "title": "Update All in Category (fill gaps only)",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "mtDevops.indexAllRepos",
+        "title": "Index All Repos",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mtDevops.updateAllRepos",
+        "title": "Update All Repos (fill gaps only)",
+        "icon": "$(sparkle)"
       }
     ],
     "viewsContainers": {
@@ -170,6 +250,88 @@
           "command": "mtDevops.refreshKubernetes",
           "when": "view == mtDevopsKubernetes",
           "group": "navigation"
+        },
+        {
+          "command": "mtDevops.jobsClearFinished",
+          "when": "view == mtDevopsJobs",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.updateAllRepos",
+          "when": "view == mtDevopsRepoHub",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.indexAllRepos",
+          "when": "view == mtDevopsRepoHub",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "mtDevops.dockerStart",
+          "when": "view == mtDevopsDocker && viewItem == mtDevopsContainer-stopped",
+          "group": "1_lifecycle@1"
+        },
+        {
+          "command": "mtDevops.dockerStop",
+          "when": "view == mtDevopsDocker && viewItem == mtDevopsContainer-running",
+          "group": "1_lifecycle@2"
+        },
+        {
+          "command": "mtDevops.dockerRestart",
+          "when": "view == mtDevopsDocker && viewItem == mtDevopsContainer-running",
+          "group": "1_lifecycle@3"
+        },
+        {
+          "command": "mtDevops.dockerLogs",
+          "when": "view == mtDevopsDocker && viewItem =~ /^mtDevopsContainer-/",
+          "group": "2_diagnostics@1"
+        },
+        {
+          "command": "mtDevops.dockerShell",
+          "when": "view == mtDevopsDocker && viewItem == mtDevopsContainer-running",
+          "group": "2_diagnostics@2"
+        },
+        {
+          "command": "mtDevops.jobRestart",
+          "when": "view == mtDevopsJobs && viewItem =~ /^mtDevopsJob-/",
+          "group": "1_lifecycle@1"
+        },
+        {
+          "command": "mtDevops.jobStop",
+          "when": "view == mtDevopsJobs && viewItem == mtDevopsJob-running",
+          "group": "1_lifecycle@2"
+        },
+        {
+          "command": "mtDevops.jobRemove",
+          "when": "view == mtDevopsJobs && viewItem =~ /^mtDevopsJob-/",
+          "group": "9_cleanup"
+        },
+        {
+          "command": "mtDevops.openRepoInVSCode",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "1_open"
+        },
+        {
+          "command": "mtDevops.indexRepo",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "2_index@1"
+        },
+        {
+          "command": "mtDevops.updateRepo",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "2_index@2"
+        },
+        {
+          "command": "mtDevops.indexCategory",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
+          "group": "2_index@1"
+        },
+        {
+          "command": "mtDevops.updateCategory",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
+          "group": "2_index@2"
         }
       ]
     }
