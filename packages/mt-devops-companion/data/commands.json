@@ -456,9 +456,27 @@
     "category": "AI Workflows & LLM API Integration"
   },
   {
+    "id": "mtDevops.catalog.mt_ai_models",
+    "command": "mt-ai-models",
+    "description": "AI: Print the live model catalog for one or both cloud providers,",
+    "category": "AI Workflows & LLM API Integration"
+  },
+  {
     "id": "mtDevops.catalog.mt_ai_quota",
     "command": "mt-ai-quota",
     "description": "AI: Check API quota and rate limits for the active AI provider",
+    "category": "AI Workflows & LLM API Integration"
+  },
+  {
+    "id": "mtDevops.catalog.mt_set_claude_model",
+    "command": "mt-set-claude-model",
+    "description": "AI: Set which Claude model 'ai'/'ai-explain'/'tf-ai-iam' use when",
+    "category": "AI Workflows & LLM API Integration"
+  },
+  {
+    "id": "mtDevops.catalog.mt_set_gemini_model",
+    "command": "mt-set-gemini-model",
+    "description": "AI: Set which Gemini model 'ai'/'ai-explain'/'tf-ai-iam' use when",
     "category": "AI Workflows & LLM API Integration"
   },
   {
@@ -534,6 +552,12 @@
     "category": "Configuration Management"
   },
   {
+    "id": "mtDevops.catalog.mt_set_hub_index_warning_threshold",
+    "command": "mt-set-hub-index-warning-threshold",
+    "description": "Config: Set how many repos mt-hub --index can be about to actually",
+    "category": "Configuration Management"
+  },
+  {
     "id": "mtDevops.catalog.mt_set_theme",
     "command": "mt-set-theme",
     "description": "Config: Set terminal color theme",
@@ -603,6 +627,12 @@
     "id": "mtDevops.catalog.mt_toggle_format_on_push",
     "command": "mt-toggle-format-on-push",
     "description": "Config: Toggle global format-on-push behavior (true/false)",
+    "category": "Configuration Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_toggle_hub_index_warning",
+    "command": "mt-toggle-hub-index-warning",
+    "description": "Config: Toggle mt-hub --index's bulk-indexing quota warning (true/false)",
     "category": "Configuration Management"
   },
   {
@@ -1112,7 +1142,7 @@
   {
     "id": "mtDevops.catalog.mt_hub",
     "command": "mt-hub",
-    "description": "System: Interactive AI-powered Repository Dashboard",
+    "description": "System: Interactive AI-powered Repository Dashboard. An unfiltered",
     "category": "MT Repo Hub - AI & Heuristic Metadata Dashboard"
   },
   {
