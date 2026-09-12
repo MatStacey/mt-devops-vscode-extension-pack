@@ -29,6 +29,10 @@
         "title": "MT DevOps: Show Status Dashboard"
       },
       {
+        "command": "mtDevops.checkForUpdates",
+        "title": "MT DevOps: Check for Extension Updates"
+      },
+      {
         "command": "mtDevops.copyForLLM",
         "title": "MT DevOps: Copy for LLM"
       },
@@ -236,6 +240,16 @@
         ]
       }
     ],
+    "configuration": {
+      "title": "MT DevOps Companion",
+      "properties": {
+        "mtDevops.checkForUpdatesOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check GitHub for a newer MT DevOps extension-pack release once every 24 hours and offer to install it. Use \"MT DevOps: Check for Extension Updates\" to check on demand regardless of this setting."
+        }
+      }
+    },
     "menus": {
       "explorer/context": [
         {
