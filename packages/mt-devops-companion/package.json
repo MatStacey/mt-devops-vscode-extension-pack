@@ -152,6 +152,16 @@
         "icon": "$(sparkle)"
       },
       {
+        "command": "mtDevops.indexWorkspaceRepos",
+        "title": "Index All Open Repos",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mtDevops.updateWorkspaceRepos",
+        "title": "Update All Open Repos (fill gaps only)",
+        "icon": "$(sparkle)"
+      },
+      {
         "command": "mtDevops.indexAllRepos",
         "title": "Index All Repos",
         "icon": "$(sync)"
@@ -401,6 +411,16 @@
         {
           "command": "mtDevops.updateCategory",
           "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
+          "group": "2_index@2"
+        },
+        {
+          "command": "mtDevops.indexWorkspaceRepos",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsWorkspaceCategory",
+          "group": "2_index@1"
+        },
+        {
+          "command": "mtDevops.updateWorkspaceRepos",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsWorkspaceCategory",
           "group": "2_index@2"
         },
         {
