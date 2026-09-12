@@ -12,6 +12,7 @@ import { showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
 import { SettingsValueItem, SettingsProvider } from "./settingsProvider";
 import { StatusProvider } from "./statusProvider";
+import { checkForUpdates } from "./updateChecker";
 
 interface CatalogEntry {
   id: string;
@@ -116,6 +117,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand("mtDevops.runCommand", () => pickAndRunCommand(catalog)),
     vscode.commands.registerCommand("mtDevops.showStatus", () => runInTerminal("mt-status")),
+    vscode.commands.registerCommand("mtDevops.checkForUpdates", () => checkForUpdates(context, true)),
     vscode.commands.registerCommand("mtDevops.copyForLLM", (uri: vscode.Uri | undefined) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (!target) {
@@ -280,6 +282,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   registerAiChatParticipant(context);
+
+  // Fire-and-forget: never blocks activation on a network call, and
+  // checkForUpdates itself swallows/reports its own errors -- a failed
+  // update check should never surface as an extension activation error.
+  if (vscode.workspace.getConfiguration("mtDevops").get<boolean>("checkForUpdatesOnStartup", true)) {
+    void checkForUpdates(context, false);
+  }
 
   registerAsyncView(context, "mtDevopsStatus", new StatusProvider(), "mtDevops.refreshStatus");
   registerAsyncView(context, "mtDevopsDoctor", new DoctorProvider(), "mtDevops.refreshDoctor");
