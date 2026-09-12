@@ -363,12 +363,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       new JobsProvider(path.join(cacheDir, ".mt_jobs.tsv")),
       "mtDevops.refreshJobs",
     );
+    const repoHubProvider = new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json"), vcsRoot);
     registerWatchedView(
       context,
       "mtDevopsRepoHub",
       path.join(cacheDir, ".vcs_hub.json"),
-      new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json"), vcsRoot),
+      repoHubProvider,
       "mtDevops.refreshRepoHub",
+    );
+    // The tree's "Open in VS Code" section reads vscode.workspace.workspaceFolders
+    // directly (no file to watch), so it needs its own refresh trigger for
+    // whenever a folder is added to or removed from the workspace.
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeWorkspaceFolders(() => repoHubProvider.refresh()),
     );
     registerWatchedView(
       context,

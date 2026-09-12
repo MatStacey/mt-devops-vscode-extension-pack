@@ -80,6 +80,24 @@ export class RepoCategoryItem extends vscode.TreeItem {
   }
 }
 
+/**
+ * The "Open in VS Code" section -- repos from the current workspace's
+ * folders, not a real mt-hub -t/--type folder under VCS_ROOT, so it
+ * gets its own contextValue rather than "mtDevopsRepoCategory": the
+ * bulk "Index All in Category"/"Update All in Category" actions target
+ * mt-hub's -t filter by name, which has no meaning for a synthetic
+ * grouping like this one, and would silently no-op (or worse, collide
+ * with a real folder that happens to share this label).
+ */
+export class WorkspaceCategoryItem extends vscode.TreeItem {
+  constructor(public readonly repos: Array<[string, RepoMeta]>) {
+    super("Open in VS Code", vscode.TreeItemCollapsibleState.Expanded);
+    this.description = `${repos.length} repo${repos.length === 1 ? "" : "s"}`;
+    this.iconPath = new vscode.ThemeIcon("window");
+    this.contextValue = "mtDevopsWorkspaceCategory";
+  }
+}
+
 class RepoErrorItem extends vscode.TreeItem {
   constructor(message: string) {
     super(message, vscode.TreeItemCollapsibleState.None);
@@ -108,6 +126,28 @@ function groupByCategory(entries: Array<[string, RepoMeta]>, vcsRoot: string): R
   return categories.map((category) => new RepoCategoryItem(category, byCategory.get(category)!));
 }
 
+/**
+ * The current workspace's folders that are actually git repos --
+ * `fs.existsSync(.../.git)` (not `-d`) so a worktree checkout (".git"
+ * is a plain file there) still counts, same test as the framework's
+ * own __mt_hub_find_repos. A plain non-repo directory added to the
+ * workspace (a scratch folder, a mounted data dir, ...) is
+ * deliberately excluded -- this section is "repos I have open", not
+ * "folders I have open".
+ */
+function findOpenWorkspaceRepos(cacheEntries: Array<[string, RepoMeta]>): Array<[string, RepoMeta]> {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  const metaByPath = new Map(cacheEntries);
+  const repos: Array<[string, RepoMeta]> = [];
+  for (const folder of folders) {
+    const repoPath = folder.uri.fsPath;
+    if (fs.existsSync(path.join(repoPath, ".git"))) {
+      repos.push([repoPath, metaByPath.get(repoPath) ?? {}]);
+    }
+  }
+  return repos;
+}
+
 export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -125,12 +165,15 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
     return element;
   }
 
-  getChildren(element?: RepoCategoryItem): vscode.TreeItem[] {
+  getChildren(element?: RepoCategoryItem | WorkspaceCategoryItem): vscode.TreeItem[] {
     if (element) {
       return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta));
     }
     try {
-      return groupByCategory(parseRepoHub(this.hubFilePath), this.vcsRoot);
+      const cacheEntries = parseRepoHub(this.hubFilePath);
+      const openRepos = findOpenWorkspaceRepos(cacheEntries);
+      const workspaceSection = openRepos.length > 0 ? [new WorkspaceCategoryItem(openRepos)] : [];
+      return [...workspaceSection, ...groupByCategory(cacheEntries, this.vcsRoot)];
     } catch (err) {
       return [new RepoErrorItem(err instanceof Error ? err.message : String(err))];
     }
