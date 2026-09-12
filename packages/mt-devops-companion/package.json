@@ -162,6 +162,10 @@
         "icon": "$(sparkle)"
       },
       {
+        "command": "mtDevops.showRepoReportFromExplorer",
+        "title": "MT DevOps: Show Repo Report"
+      },
+      {
         "command": "mtDevops.indexRepoFromExplorer",
         "title": "MT DevOps: Index Repo (force reindex)"
       },
@@ -261,11 +265,18 @@
           "group": "7_modification"
         },
         {
+          "command": "mtDevops.showRepoReportFromExplorer",
+          "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        },
+        {
           "command": "mtDevops.indexRepoFromExplorer",
+          "when": "explorerResourceIsFolder",
           "group": "7_modification"
         },
         {
           "command": "mtDevops.updateRepoIndexFromExplorer",
+          "when": "explorerResourceIsFolder",
           "group": "7_modification"
         }
       ],
