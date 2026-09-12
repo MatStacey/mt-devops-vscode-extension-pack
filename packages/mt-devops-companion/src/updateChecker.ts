@@ -225,6 +225,39 @@ async function offerUpdate(
   }
 }
 
+export interface CompanionUpdateStatus {
+  installedVersion: string;
+  /** "unknown" if the release fetch failed -- callers should treat that the same as "no update info available", not "up to date". */
+  latestVersion: string;
+  updateAvailable: boolean;
+}
+
+/**
+ * A read-only counterpart to checkForUpdates for the Status panel's
+ * "Extension" section (mirroring the Framework section's own
+ * version/update-available rows) -- reports this extension's own
+ * installed-vs-latest version without ever showing a notification or
+ * touching the skip/last-checked state, so viewing the Status panel
+ * never has side effects on the separate notification flow.
+ */
+export async function getCompanionUpdateStatus(): Promise<CompanionUpdateStatus | null> {
+  const ext = vscode.extensions.getExtension("matstacey.mt-devops-companion");
+  if (!ext) return null;
+  const installedVersion = ext.packageJSON.version as string;
+
+  try {
+    const release = await fetchLatestRelease();
+    return {
+      installedVersion,
+      latestVersion: release.version,
+      updateAvailable: isNewerVersion(release.version, installedVersion),
+    };
+  } catch (err) {
+    log(`Status panel: failed to fetch latest release -- ${err instanceof Error ? err.message : String(err)}`);
+    return { installedVersion, latestVersion: "unknown", updateAvailable: false };
+  }
+}
+
 /**
  * Checks the latest GitHub release against every installed extension
  * from this pack, and offers to download+install (via VS Code's own
