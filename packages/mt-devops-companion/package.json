@@ -162,6 +162,10 @@
         "icon": "$(sparkle)"
       },
       {
+        "command": "mtDevops.indexRepoFromExplorer",
+        "title": "MT DevOps: Index Repo (force reindex)"
+      },
+      {
         "command": "mtDevops.updateRepoIndexFromExplorer",
         "title": "MT DevOps: Update Repo Index (fill gaps only)"
       },
@@ -254,6 +258,10 @@
       "explorer/context": [
         {
           "command": "mtDevops.copyForLLM",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.indexRepoFromExplorer",
           "group": "7_modification"
         },
         {

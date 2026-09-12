@@ -126,12 +126,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       runInTerminal(`mt-copy ${shellQuote(target.fsPath)}`);
     }),
-    // Explorer counterpart to the Repo Hub tree's own right-click "Update
-    // This Repo" -- lets a repo be gap-filled from wherever it's already
-    // open in the editor, without needing to also find it in the Repo Hub
-    // sidebar. Filters by basename (mt-hub's own -r/--repo match), so this
-    // is only meaningful when right-clicking a repo's root folder, not an
-    // arbitrary file/subfolder inside one.
+    // Explorer counterparts to the Repo Hub tree's own right-click "Index
+    // This Repo"/"Update This Repo" -- let a repo be (re)indexed from
+    // wherever it's already open in the editor, without needing to also
+    // find it in the Repo Hub sidebar. Filter by basename (mt-hub's own
+    // -r/--repo match), so these are only meaningful when right-clicking
+    // a repo's root folder, not an arbitrary file/subfolder inside one.
+    vscode.commands.registerCommand("mtDevops.indexRepoFromExplorer", (uri: vscode.Uri | undefined) => {
+      const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+      if (!target) {
+        vscode.window.showWarningMessage("MT DevOps: select a repository folder first.");
+        return;
+      }
+      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(target.fsPath))}`);
+    }),
     vscode.commands.registerCommand("mtDevops.updateRepoIndexFromExplorer", (uri: vscode.Uri | undefined) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (!target) {
