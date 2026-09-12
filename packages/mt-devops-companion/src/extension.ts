@@ -7,7 +7,7 @@ import { DockerContainerItem, DockerProvider } from "./dockerProvider";
 import { resolveFrameworkPaths, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
-import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem } from "./repoHubProvider";
+import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem, WorkspaceCategoryItem } from "./repoHubProvider";
 import { showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
 import { SettingsValueItem, SettingsProvider } from "./settingsProvider";
@@ -311,6 +311,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (choice === "Index All") runInTerminal("mt-hub --index -f");
     }),
     vscode.commands.registerCommand("mtDevops.updateAllRepos", () => runInTerminal("mt-hub --index -u")),
+    // The "Open in VS Code" section is a curated set of repo names, not
+    // a real mt-hub -t/--type folder, so there's no single filter that
+    // covers it the way indexCategory/updateCategory's -t does -- chain
+    // one -r invocation per repo instead, same flag each already uses
+    // per-repo. No confirmation dialog, matching indexCategory's own
+    // precedent (only the whole-VCS_ROOT indexAllRepos warns first,
+    // since this is bounded to whatever's actually open right now).
+    vscode.commands.registerCommand("mtDevops.indexWorkspaceRepos", (item: WorkspaceCategoryItem) => {
+      const command = item.repos
+        .map(([repoPath]) => `mt-hub --index -f -r ${shellQuote(path.basename(repoPath))}`)
+        .join(" && ");
+      runInTerminal(command);
+    }),
+    vscode.commands.registerCommand("mtDevops.updateWorkspaceRepos", (item: WorkspaceCategoryItem) => {
+      const command = item.repos
+        .map(([repoPath]) => `mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}`)
+        .join(" && ");
+      runInTerminal(command);
+    }),
   );
 
   registerAiChatParticipant(context);
