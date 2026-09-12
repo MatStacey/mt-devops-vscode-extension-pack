@@ -7,7 +7,7 @@ import { DockerContainerItem, DockerProvider } from "./dockerProvider";
 import { resolveFrameworkPaths, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
-import { RepoCategoryItem, RepoHubProvider, RepoTreeItem } from "./repoHubProvider";
+import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem } from "./repoHubProvider";
 import { showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
 import { SettingsValueItem, SettingsProvider } from "./settingsProvider";
@@ -31,6 +31,35 @@ function loadCatalog(extensionUri: vscode.Uri): CatalogEntry[] {
   const catalogPath = path.join(extensionUri.fsPath, "data", "commands.json");
   const raw = fs.readFileSync(catalogPath, "utf8");
   return JSON.parse(raw) as CatalogEntry[];
+}
+
+/**
+ * Resolves the Explorer right-click target for a repo-scoped command
+ * (index/update/show report), verifying it's a directory and the root
+ * of an actual git repository -- `test -e` semantics (not `-d`), same
+ * as the framework's own __mt_hub_find_repos, so a worktree checkout
+ * (".git" is a file there) still counts. Returns undefined (after
+ * showing the user why) for anything else: no selection, a file, or a
+ * folder that just happens to sit inside/near a repo without being its
+ * root. These commands only make sense against a repo root since
+ * mt-hub's own -r/--repo filter matches by exact basename.
+ */
+function resolveRepoRootTarget(uri: vscode.Uri | undefined): string | undefined {
+  const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+  if (!target) {
+    vscode.window.showWarningMessage("MT DevOps: select a repository folder first.");
+    return undefined;
+  }
+  const folderPath = target.fsPath;
+  if (!fs.existsSync(folderPath) || !fs.statSync(folderPath).isDirectory()) {
+    vscode.window.showWarningMessage("MT DevOps: select a folder, not a file.");
+    return undefined;
+  }
+  if (!fs.existsSync(path.join(folderPath, ".git"))) {
+    vscode.window.showWarningMessage(`MT DevOps: "${path.basename(folderPath)}" isn't the root of a git repository.`);
+    return undefined;
+  }
+  return folderPath;
 }
 
 /**
@@ -126,19 +155,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       runInTerminal(`mt-copy ${shellQuote(target.fsPath)}`);
     }),
-    // Explorer counterpart to the Repo Hub tree's own right-click "Update
-    // This Repo" -- lets a repo be gap-filled from wherever it's already
-    // open in the editor, without needing to also find it in the Repo Hub
-    // sidebar. Filters by basename (mt-hub's own -r/--repo match), so this
-    // is only meaningful when right-clicking a repo's root folder, not an
-    // arbitrary file/subfolder inside one.
+    // Explorer counterparts to the Repo Hub tree's own right-click "Index
+    // This Repo"/"Update This Repo" -- let a repo be (re)indexed from
+    // wherever it's already open in the editor, without needing to also
+    // find it in the Repo Hub sidebar. resolveRepoRootTarget guards all
+    // three of these against a non-folder selection or a folder that
+    // isn't actually a repo root, since mt-hub's own -r/--repo match is
+    // an exact basename match.
+    vscode.commands.registerCommand("mtDevops.indexRepoFromExplorer", (uri: vscode.Uri | undefined) => {
+      const repoPath = resolveRepoRootTarget(uri);
+      if (!repoPath) return;
+      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(repoPath))}`);
+    }),
     vscode.commands.registerCommand("mtDevops.updateRepoIndexFromExplorer", (uri: vscode.Uri | undefined) => {
-      const target = uri ?? vscode.window.activeTextEditor?.document.uri;
-      if (!target) {
-        vscode.window.showWarningMessage("MT DevOps: select a repository folder first.");
-        return;
-      }
-      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(target.fsPath))}`);
+      const repoPath = resolveRepoRootTarget(uri);
+      if (!repoPath) return;
+      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}`);
     }),
 
     // Docker: single-container actions from the sidebar's context menu.
@@ -297,6 +329,32 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   try {
     const { cacheDir, configDir, vcsRoot } = await resolveFrameworkPaths();
+
+    // Explorer counterpart to the Repo Hub tree's own click-to-open
+    // report -- reads the same .vcs_hub.json cache by exact absolute
+    // path (no basename fallback needed here, unlike mt-hub --preview's
+    // CLI convenience, since Explorer already gives us the exact path).
+    // A repo that's never been indexed just gets an empty meta object;
+    // showRepoReport already renders every field as "Unknown"/"None" in
+    // that case, same as a freshly-discovered repo in the sidebar.
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.showRepoReportFromExplorer", (uri: vscode.Uri | undefined) => {
+        const repoPath = resolveRepoRootTarget(uri);
+        if (!repoPath) return;
+        let meta: RepoMeta = {};
+        try {
+          const cache = JSON.parse(fs.readFileSync(path.join(cacheDir, ".vcs_hub.json"), "utf8")) as Record<
+            string,
+            RepoMeta
+          >;
+          meta = cache[repoPath] ?? {};
+        } catch {
+          // No cache file yet, or this repo isn't in it -- fine, show the
+          // report with an empty meta object rather than failing.
+        }
+        showRepoReport(repoPath, meta);
+      }),
+    );
 
     registerWatchedView(
       context,
