@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { runFrameworkJson } from "./framework";
+import { CompanionUpdateStatus, getCompanionUpdateStatus } from "./updateChecker";
 
 interface StatusData {
   framework: { version: string; theme: string; ai_enabled: boolean; ai_provider: string };
@@ -37,7 +38,7 @@ class StatusErrorItem extends vscode.TreeItem {
   }
 }
 
-function buildCategories(data: StatusData): StatusCategoryItem[] {
+function buildCategories(data: StatusData, companion: CompanionUpdateStatus | null): StatusCategoryItem[] {
   return [
     new StatusCategoryItem("Framework", new vscode.ThemeIcon("gear"), [
       new StatusLeafItem("Version", data.framework.version),
@@ -47,6 +48,20 @@ function buildCategories(data: StatusData): StatusCategoryItem[] {
         `${data.framework.ai_enabled ? "enabled" : "disabled"} (${data.framework.ai_provider})`,
       ),
     ]),
+    // Mirrors the Framework category above, but for this VS Code
+    // extension itself -- separate from it since one's the bash
+    // framework's own version and the other is this extension's,
+    // distinct concerns that happen to both matter for "is everything
+    // up to date". Omitted entirely if the extension ID can't be
+    // resolved (shouldn't happen -- this code is that extension --
+    // but getCompanionUpdateStatus already returns null defensively).
+    ...(companion
+      ? [
+          new StatusCategoryItem("Extension", new vscode.ThemeIcon("extensions"), [
+            new StatusLeafItem("Version", companion.installedVersion),
+          ]),
+        ]
+      : []),
     new StatusCategoryItem(
       "Sync Repo",
       new vscode.ThemeIcon("repo"),
@@ -86,6 +101,19 @@ function buildCategories(data: StatusData): StatusCategoryItem[] {
         data.updates.framework_update_available ? `${data.updates.framework_update_available} available` : "Up to date",
         data.updates.framework_update_available ? WARN_ICON : OK_ICON,
       ),
+      ...(companion
+        ? [
+            new StatusLeafItem(
+              "Extension",
+              companion.latestVersion === "unknown"
+                ? "Couldn't check (see \"MT DevOps\" output log)"
+                : companion.updateAvailable
+                  ? `${companion.latestVersion} available`
+                  : "Up to date",
+              companion.latestVersion === "unknown" ? WARN_ICON : companion.updateAvailable ? WARN_ICON : OK_ICON,
+            ),
+          ]
+        : []),
     ]),
   ];
 }
@@ -105,8 +133,11 @@ export class StatusProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
   async getChildren(element?: StatusCategoryItem): Promise<vscode.TreeItem[]> {
     if (element) return element.children;
     try {
-      const data = await runFrameworkJson<StatusData>("mt-status --json");
-      return buildCategories(data);
+      const [data, companion] = await Promise.all([
+        runFrameworkJson<StatusData>("mt-status --json"),
+        getCompanionUpdateStatus(),
+      ]);
+      return buildCategories(data, companion);
     } catch (err) {
       return [new StatusErrorItem(err instanceof Error ? err.message : String(err))];
     }

@@ -15,16 +15,34 @@ const REPO_NAME = "mt-devops-vscode-extension-pack";
  * workflow, so checking one release covers all of them; only extensions
  * actually installed are ever offered an update.
  */
+// VS Code always canonicalizes extension IDs to lowercase (matches
+// `vscode.extensions.getExtension` regardless of the publisher/name
+// casing in package.json), spelled out lowercase here too so there's
+// no ambiguity relying on getExtension()'s own case-insensitive match.
 const KNOWN_EXTENSIONS: Array<{ id: string; packageName: string }> = [
-  { id: "MatStacey.mt-devops-companion", packageName: "mt-devops-companion" },
-  { id: "MatStacey.generic-dev-extension-pack", packageName: "generic-dev-extension-pack" },
-  { id: "MatStacey.mt-devops-vscode-extension-pack", packageName: "mt-devops-vscode-extension-pack" },
+  { id: "matstacey.mt-devops-companion", packageName: "mt-devops-companion" },
+  { id: "matstacey.generic-dev-extension-pack", packageName: "generic-dev-extension-pack" },
+  { id: "matstacey.mt-devops-vscode-extension-pack", packageName: "mt-devops-vscode-extension-pack" },
 ];
 
 const LAST_CHECK_KEY = "mtDevops.lastUpdateCheckAt";
 const SKIPPED_VERSION_KEY = "mtDevops.skippedUpdateVersion";
 const BACKGROUND_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const USER_AGENT = "mt-devops-companion-update-checker";
+
+// A background check failure (network, GitHub rate limiting, a
+// corporate proxy blocking api.github.com, ...) previously failed
+// completely silently -- interactive-only error toasts meant "the
+// updater isn't working" had no way to tell a real failure apart from
+// "there's genuinely nothing new yet" without re-running the manual
+// command and hoping the failure reproduces. Every check now logs
+// here regardless of outcome, so View > Output > "MT DevOps" always
+// has the real story.
+let outputChannel: vscode.OutputChannel | undefined;
+function log(message: string): void {
+  if (!outputChannel) outputChannel = vscode.window.createOutputChannel("MT DevOps");
+  outputChannel.appendLine(`[${new Date().toISOString()}] ${message}`);
+}
 
 interface ReleaseAsset {
   name: string;
@@ -121,11 +139,23 @@ function findOutdatedExtensions(release: LatestRelease): OutdatedExtension[] {
   const outdated: OutdatedExtension[] = [];
   for (const known of KNOWN_EXTENSIONS) {
     const ext = vscode.extensions.getExtension(known.id);
-    if (!ext) continue;
+    if (!ext) {
+      log(`${known.id} is not installed -- skipping.`);
+      continue;
+    }
     const currentVersion = ext.packageJSON.version as string;
-    if (!isNewerVersion(release.version, currentVersion)) continue;
+    if (!isNewerVersion(release.version, currentVersion)) {
+      log(`${known.id} is up to date (installed ${currentVersion}, latest ${release.version}).`);
+      continue;
+    }
     const asset = release.assets.find((a) => a.name === `${known.packageName}-${release.version}.vsix`);
-    if (!asset) continue;
+    if (!asset) {
+      log(
+        `${known.id}: release ${release.version} has no matching asset (expected "${known.packageName}-${release.version}.vsix"); found [${release.assets.map((a) => a.name).join(", ")}]. Skipping.`,
+      );
+      continue;
+    }
+    log(`${known.id}: update available (installed ${currentVersion}, latest ${release.version}).`);
     outdated.push({
       id: known.id,
       displayName: ext.packageJSON.displayName ?? known.packageName,
@@ -138,8 +168,11 @@ function findOutdatedExtensions(release: LatestRelease): OutdatedExtension[] {
 
 async function installFromAsset(asset: ReleaseAsset): Promise<void> {
   const tmpPath = path.join(os.tmpdir(), asset.name);
+  log(`Downloading ${asset.browser_download_url} -> ${tmpPath}...`);
   await downloadFile(asset.browser_download_url, tmpPath);
+  log(`Installing ${tmpPath}...`);
   await vscode.commands.executeCommand("workbench.extensions.installExtension", vscode.Uri.file(tmpPath));
+  log(`Installed ${asset.name}.`);
 }
 
 async function offerUpdate(
@@ -156,14 +189,22 @@ async function offerUpdate(
   );
 
   if (choice === "Update Now") {
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: "Updating MT DevOps extensions..." },
-      async () => {
-        for (const ext of outdated) {
-          await installFromAsset(ext.asset);
-        }
-      },
-    );
+    try {
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "Updating MT DevOps extensions..." },
+        async () => {
+          for (const ext of outdated) {
+            await installFromAsset(ext.asset);
+          }
+        },
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log(`Update failed: ${message}`);
+      const choice2 = await vscode.window.showErrorMessage(`MT DevOps: update failed -- ${message}`, "Show Log");
+      if (choice2 === "Show Log") outputChannel?.show();
+      return;
+    }
     const reload = await vscode.window.showInformationMessage(
       "MT DevOps extensions updated. Reload the window to finish.",
       "Reload Now",
@@ -184,6 +225,39 @@ async function offerUpdate(
   }
 }
 
+export interface CompanionUpdateStatus {
+  installedVersion: string;
+  /** "unknown" if the release fetch failed -- callers should treat that the same as "no update info available", not "up to date". */
+  latestVersion: string;
+  updateAvailable: boolean;
+}
+
+/**
+ * A read-only counterpart to checkForUpdates for the Status panel's
+ * "Extension" section (mirroring the Framework section's own
+ * version/update-available rows) -- reports this extension's own
+ * installed-vs-latest version without ever showing a notification or
+ * touching the skip/last-checked state, so viewing the Status panel
+ * never has side effects on the separate notification flow.
+ */
+export async function getCompanionUpdateStatus(): Promise<CompanionUpdateStatus | null> {
+  const ext = vscode.extensions.getExtension("matstacey.mt-devops-companion");
+  if (!ext) return null;
+  const installedVersion = ext.packageJSON.version as string;
+
+  try {
+    const release = await fetchLatestRelease();
+    return {
+      installedVersion,
+      latestVersion: release.version,
+      updateAvailable: isNewerVersion(release.version, installedVersion),
+    };
+  } catch (err) {
+    log(`Status panel: failed to fetch latest release -- ${err instanceof Error ? err.message : String(err)}`);
+    return { installedVersion, latestVersion: "unknown", updateAvailable: false };
+  }
+}
+
 /**
  * Checks the latest GitHub release against every installed extension
  * from this pack, and offers to download+install (via VS Code's own
@@ -198,31 +272,46 @@ async function offerUpdate(
  * network call doesn't happen on every single window open).
  */
 export async function checkForUpdates(context: vscode.ExtensionContext, interactive: boolean): Promise<void> {
+  log(`Checking for updates (interactive=${interactive})...`);
+
   if (!interactive) {
     const lastChecked = context.globalState.get<number>(LAST_CHECK_KEY, 0);
-    if (Date.now() - lastChecked < BACKGROUND_CHECK_INTERVAL_MS) return;
+    const nextCheckDue = lastChecked + BACKGROUND_CHECK_INTERVAL_MS;
+    if (Date.now() < nextCheckDue) {
+      log(`Skipping background check -- next one due at ${new Date(nextCheckDue).toISOString()}.`);
+      return;
+    }
   }
 
   let release: LatestRelease;
   try {
     release = await fetchLatestRelease();
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log(`Failed to fetch the latest release: ${message}`);
     if (interactive) {
-      vscode.window.showErrorMessage(
-        `MT DevOps: couldn't check for updates -- ${err instanceof Error ? err.message : String(err)}`,
+      const choice = await vscode.window.showErrorMessage(
+        `MT DevOps: couldn't check for updates -- ${message}`,
+        "Show Log",
       );
+      if (choice === "Show Log") outputChannel?.show();
     }
     return;
   }
+  log(`Latest release: ${release.version}.`);
   await context.globalState.update(LAST_CHECK_KEY, Date.now());
 
   const outdated = findOutdatedExtensions(release);
   if (outdated.length === 0) {
+    log("Nothing to update.");
     if (interactive) vscode.window.showInformationMessage("MT DevOps extensions are up to date.");
     return;
   }
 
-  if (!interactive && context.globalState.get<string>(SKIPPED_VERSION_KEY) === release.version) return;
+  if (!interactive && context.globalState.get<string>(SKIPPED_VERSION_KEY) === release.version) {
+    log(`Update to ${release.version} available but previously skipped -- not renagging in the background.`);
+    return;
+  }
 
   await offerUpdate(context, release, outdated);
 }
