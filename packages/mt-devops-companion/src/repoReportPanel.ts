@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
 import { openNewTerminalAt, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote } from "./framework";
+import { showInfraOverview } from "./infraOverviewPanel";
 import { getIndexModifierFlags } from "./repoHubProvider";
 import type { RepoMeta } from "./repoHubProvider";
 
@@ -609,6 +610,7 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     <button id="generateReadmeBtn">Generate/Update README</button>
     <button id="generateGitignoreBtn">Generate/Update .gitignore</button>
     <button id="checkDepsBtn">Check Dependencies</button>
+    <button id="infraOverviewBtn">Infrastructure Overview</button>
     ${data.hasDockerCompose ? `<button id="viewDockerBtn">View in Docker Panel</button>` : ""}
     ${data.hasHelmChart ? `<button id="viewHelmBtn">View in Helm Panel</button>` : ""}
   </div>
@@ -663,6 +665,9 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
       // interpolates -- same trust boundary as the rest of this file's
       // server-rendered HTML strings (buildGithubHtml, metaRow, ...).
       document.getElementById("depsResult").innerHTML = event.data.html;
+    });
+    document.getElementById("infraOverviewBtn").addEventListener("click", () => {
+      vscode.postMessage({ command: "showInfraOverview" });
     });
     document.getElementById("pathRow").addEventListener("click", () => {
       vscode.postMessage({ command: "openNewTerminal" });
@@ -865,6 +870,10 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
             result = { status: "error", tool: null, message: err instanceof Error ? err.message : String(err), vulnerabilities: null };
           }
           activePanel?.webview.postMessage({ command: "dependencyAuditResult", html: buildDependencyAuditHtml(result) });
+          return;
+        }
+        if (message.command === "showInfraOverview") {
+          await showInfraOverview(displayedRepoPath);
           return;
         }
         // Each view contribution gets a VS Code-generated "<viewId>.focus"

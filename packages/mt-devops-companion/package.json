@@ -285,6 +285,16 @@
         "title": "MT DevOps: Open Export Wizard"
       },
       {
+        "command": "mtDevops.generateInfraOverview",
+        "title": "Generate Infrastructure Overview",
+        "icon": "$(server-environment)"
+      },
+      {
+        "command": "mtDevops.showInfraOverview",
+        "title": "Show Infrastructure Overview",
+        "icon": "$(server-environment)"
+      },
+      {
         "command": "mtDevops.wizardChangeSchema",
         "title": "Change Export Schema"
       },
@@ -679,6 +689,16 @@
           "command": "mtDevops.openExportWizard",
           "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
           "group": "3_sync@4"
+        },
+        {
+          "command": "mtDevops.showInfraOverview",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "4_infra@1"
+        },
+        {
+          "command": "mtDevops.generateInfraOverview",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "4_infra@2"
         },
         {
           "command": "mtDevops.toggleFavoriteRepo",
