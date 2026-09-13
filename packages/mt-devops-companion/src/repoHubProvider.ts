@@ -15,6 +15,13 @@ export interface RepoGcp {
   services: string[];
 }
 
+/** From __mt_hub_detect_top_contributors (.bash.d/20-vcs/53-vcs-insight.sh) -- top 5 authors on the repo's default branch within the configured lookback window (git.contributor_lookback_months, default 12 months), ordered highest-commits-first. last_commit is a Unix epoch (seconds). */
+export interface RepoContributor {
+  name: string;
+  commits: number;
+  last_commit: number;
+}
+
 export interface RepoMeta {
   category?: string;
   description?: string;
@@ -24,6 +31,7 @@ export interface RepoMeta {
   testing?: string;
   environments?: RepoEnvironment[];
   gcp?: RepoGcp;
+  top_contributors?: RepoContributor[];
   last_indexed?: number;
 }
 
