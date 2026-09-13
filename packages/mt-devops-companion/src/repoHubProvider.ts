@@ -49,8 +49,9 @@ export class RepoTreeItem extends vscode.TreeItem {
     public readonly repoPath: string,
     public readonly meta: RepoMeta,
     dirty = false,
+    favorited = false,
   ) {
-    super(path.basename(repoPath), vscode.TreeItemCollapsibleState.None);
+    super(`${favorited ? "⭐ " : ""}${path.basename(repoPath)}`, vscode.TreeItemCollapsibleState.None);
     this.description = [meta.stack || meta.category || "", dirty ? "●" : ""].filter(Boolean).join("  ");
     this.iconPath = dirty
       ? new vscode.ThemeIcon("repo", new vscode.ThemeColor("gitDecoration.modifiedResourceForeground"))
@@ -106,6 +107,22 @@ export class WorkspaceCategoryItem extends vscode.TreeItem {
     this.description = `${repos.length} repo${repos.length === 1 ? "" : "s"}`;
     this.iconPath = new vscode.ThemeIcon("window");
     this.contextValue = "mtDevopsWorkspaceCategory";
+  }
+}
+
+/**
+ * A curated pinned-repos section at the top of the tree -- persisted in
+ * extension globalState (see RepoHubProvider.toggleFavorite), not a real
+ * mt-hub grouping, so like WorkspaceCategoryItem it gets its own
+ * contextValue rather than "mtDevopsRepoCategory" (the bulk index/update
+ * actions' -t filter has no meaning for it).
+ */
+export class FavoritesCategoryItem extends vscode.TreeItem {
+  constructor(public readonly repos: Array<[string, RepoMeta]>) {
+    super("Favorites", vscode.TreeItemCollapsibleState.Expanded);
+    this.description = `${repos.length} repo${repos.length === 1 ? "" : "s"}`;
+    this.iconPath = new vscode.ThemeIcon("star-full");
+    this.contextValue = "mtDevopsFavoritesCategory";
   }
 }
 
@@ -203,6 +220,8 @@ function findOpenWorkspaceRepos(cacheEntries: Array<[string, RepoMeta]>): Array<
   return repos;
 }
 
+const FAVORITES_STATE_KEY = "mtDevops.favoriteRepoPaths";
+
 export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
@@ -210,7 +229,23 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
   constructor(
     private readonly hubFilePath: string,
     private readonly vcsRoot: string,
+    private readonly state: vscode.Memento,
   ) {}
+
+  private getFavoritePaths(): string[] {
+    return this.state.get(FAVORITES_STATE_KEY, []);
+  }
+
+  isFavorite(repoPath: string): boolean {
+    return this.getFavoritePaths().includes(repoPath);
+  }
+
+  async toggleFavorite(repoPath: string): Promise<void> {
+    const favorites = this.getFavoritePaths();
+    const next = favorites.includes(repoPath) ? favorites.filter((p) => p !== repoPath) : [...favorites, repoPath];
+    await this.state.update(FAVORITES_STATE_KEY, next);
+    this.refresh();
+  }
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
@@ -220,28 +255,37 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
     return element;
   }
 
-  async getChildren(element?: RepoCategoryItem | WorkspaceCategoryItem): Promise<vscode.TreeItem[]> {
+  async getChildren(element?: RepoCategoryItem | WorkspaceCategoryItem | FavoritesCategoryItem): Promise<vscode.TreeItem[]> {
     if (element instanceof WorkspaceCategoryItem) {
       // Only ever a handful of repos (whatever's actually open), so a
       // live `git status` per repo here is cheap -- doing the same for
       // every repo in the full category tree below would not be.
       const dirtyFlags = await Promise.all(element.repos.map(([repoPath]) => isDirty(repoPath)));
-      return element.repos.map(([repoPath, meta], i) => new RepoTreeItem(repoPath, meta, dirtyFlags[i]));
+      return element.repos.map(([repoPath, meta], i) => new RepoTreeItem(repoPath, meta, dirtyFlags[i], this.isFavorite(repoPath)));
+    }
+    if (element instanceof FavoritesCategoryItem) {
+      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, false, true));
     }
     if (element) {
-      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta));
+      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, false, this.isFavorite(repoPath)));
     }
     try {
       const cacheEntries = parseRepoHub(this.hubFilePath);
       const openRepos = findOpenWorkspaceRepos(cacheEntries);
       const workspaceSection = openRepos.length > 0 ? [new WorkspaceCategoryItem(openRepos)] : [];
 
+      const metaByPath = new Map([...cacheEntries, ...openRepos]);
+      const favoriteEntries: Array<[string, RepoMeta]> = this.getFavoritePaths()
+        .filter((repoPath) => metaByPath.has(repoPath))
+        .map((repoPath) => [repoPath, metaByPath.get(repoPath)!]);
+      const favoritesSection = favoriteEntries.length > 0 ? [new FavoritesCategoryItem(favoriteEntries)] : [];
+
       const needsIndex = cacheEntries.filter(([, meta]) => hasIndexGap(meta)).length;
       const openDirtyFlags = await Promise.all(openRepos.map(([repoPath]) => isDirty(repoPath)));
       const dirtyCount = openDirtyFlags.filter(Boolean).length;
       const summary = new SummaryItem(cacheEntries.length, needsIndex, dirtyCount);
 
-      return [summary, ...workspaceSection, ...groupByCategory(cacheEntries, this.vcsRoot)];
+      return [summary, ...favoritesSection, ...workspaceSection, ...groupByCategory(cacheEntries, this.vcsRoot)];
     } catch (err) {
       return [new RepoErrorItem(err instanceof Error ? err.message : String(err))];
     }

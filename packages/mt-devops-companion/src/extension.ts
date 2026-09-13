@@ -556,7 +556,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       new JobsProvider(path.join(cacheDir, ".mt_jobs.tsv")),
       "mtDevops.refreshJobs",
     );
-    const repoHubProvider = new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json"), vcsRoot);
+    const repoHubProvider = new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json"), vcsRoot, context.globalState);
     registerWatchedView(
       context,
       "mtDevopsRepoHub",
@@ -569,6 +569,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // whenever a folder is added to or removed from the workspace.
     context.subscriptions.push(
       vscode.workspace.onDidChangeWorkspaceFolders(() => repoHubProvider.refresh()),
+    );
+    // One toggle command rather than two contextValue-gated
+    // Add/Remove-Favorite commands -- avoids having to also update every
+    // other action already scoped to an exact `viewItem == mtDevopsRepo`
+    // match, since favorited state here is just a visual (star prefix +
+    // Favorites section membership), not a distinct item kind.
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.toggleFavoriteRepo", (item: RepoTreeItem) => repoHubProvider.toggleFavorite(item.repoPath)),
     );
     registerWatchedView(
       context,
