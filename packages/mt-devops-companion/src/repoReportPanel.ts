@@ -51,6 +51,13 @@ interface AiUpdateResult {
   pending: string | null;
 }
 
+interface DependencyAuditResult {
+  status: "ok" | "unsupported" | "tool-missing" | "error";
+  tool: string | null;
+  message: string | null;
+  vulnerabilities: Record<string, number> | null;
+}
+
 const AI_UPDATE_KINDS = {
   readme: { command: "mt-ai-readme", label: "README" },
   gitignore: { command: "mt-ai-gitignore", label: ".gitignore" },
@@ -436,6 +443,22 @@ function buildGithubHtml(github: GithubStatus | null, webUrl: string | undefined
   return `<h2>GitHub</h2><div>${prLine}${ciLine}</div>`;
 }
 
+/** Renders mt-audit-deps --json's result for injection into #depsResult -- every interpolated value is either a fixed literal or passed through escapeHtml first. */
+function buildDependencyAuditHtml(result: DependencyAuditResult): string {
+  if (result.status === "ok" && result.vulnerabilities) {
+    const total = result.vulnerabilities.total ?? 0;
+    if (total === 0) {
+      return `<div class="staleWarning" style="background:transparent;border-color:var(--vscode-panel-border);">✅ ${escapeHtml(result.tool ?? "")}: no known vulnerabilities.</div>`;
+    }
+    const counts = Object.entries(result.vulnerabilities)
+      .filter(([key, value]) => key !== "total" && typeof value === "number" && value > 0)
+      .map(([key, value]) => `${escapeHtml(key)}: ${value}`)
+      .join(", ");
+    return `<div class="staleWarning">⚠️ ${escapeHtml(result.tool ?? "")}: ${total} vulnerabilit${total === 1 ? "y" : "ies"}${counts ? ` (${counts})` : ""}.</div>`;
+  }
+  return `<div class="staleWarning">ℹ️ ${escapeHtml(result.message ?? "Dependency audit unavailable.")}</div>`;
+}
+
 function buildCommitsHtml(commits: CommitEntry[], remote: RemoteInfo | null): string {
   if (!commits.length) return "<li class='dim'>No commits yet.</li>";
   return commits
@@ -571,9 +594,12 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     <button id="updateIndexBtn">Update Missing Index</button>
     <button id="generateReadmeBtn">Generate/Update README</button>
     <button id="generateGitignoreBtn">Generate/Update .gitignore</button>
+    <button id="checkDepsBtn">Check Dependencies</button>
     ${data.hasDockerCompose ? `<button id="viewDockerBtn">View in Docker Panel</button>` : ""}
     ${data.hasHelmChart ? `<button id="viewHelmBtn">View in Helm Panel</button>` : ""}
   </div>
+
+  <div id="depsResult"></div>
 
   ${readmeSection}
 
@@ -607,6 +633,22 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     });
     document.getElementById("generateGitignoreBtn").addEventListener("click", () => {
       vscode.postMessage({ command: "generateGitignore" });
+    });
+    const checkDepsBtn = document.getElementById("checkDepsBtn");
+    checkDepsBtn.addEventListener("click", () => {
+      checkDepsBtn.disabled = true;
+      checkDepsBtn.textContent = "Checking...";
+      vscode.postMessage({ command: "checkDependencies" });
+    });
+    window.addEventListener("message", (event) => {
+      if (event.data.command !== "dependencyAuditResult") return;
+      checkDepsBtn.disabled = false;
+      checkDepsBtn.textContent = "Check Dependencies";
+      // Safe: event.data.html is built extension-side by
+      // buildDependencyAuditHtml, which escapeHtml()s every value it
+      // interpolates -- same trust boundary as the rest of this file's
+      // server-rendered HTML strings (buildGithubHtml, metaRow, ...).
+      document.getElementById("depsResult").innerHTML = event.data.html;
     });
     document.getElementById("pathRow").addEventListener("click", () => {
       vscode.postMessage({ command: "openNewTerminal" });
@@ -783,6 +825,19 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
         }
         if (message.command === "generateGitignore") {
           await runAiUpdateFlow(displayedRepoPath, "gitignore");
+          return;
+        }
+        if (message.command === "checkDependencies") {
+          // Deliberately on-demand only, per plan -- a real audit hits a
+          // registry/database and can take several seconds, too slow to
+          // run automatically as part of collectReportData on every open.
+          let result: DependencyAuditResult;
+          try {
+            result = await runFrameworkJson<DependencyAuditResult>(`cd ${shellQuote(displayedRepoPath)} && mt-audit-deps --json`);
+          } catch (err) {
+            result = { status: "error", tool: null, message: err instanceof Error ? err.message : String(err), vulnerabilities: null };
+          }
+          activePanel?.webview.postMessage({ command: "dependencyAuditResult", html: buildDependencyAuditHtml(result) });
           return;
         }
         // Each view contribution gets a VS Code-generated "<viewId>.focus"
