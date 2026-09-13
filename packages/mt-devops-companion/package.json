@@ -267,6 +267,16 @@
         "title": "MT DevOps: Cleanup LLM Exports"
       },
       {
+        "command": "mtDevops.createLlmExport",
+        "title": "Create LLM Export",
+        "icon": "$(export)"
+      },
+      {
+        "command": "mtDevops.viewExports",
+        "title": "View Exports",
+        "icon": "$(folder-opened)"
+      },
+      {
         "command": "mtDevops.showRepoReportFromExplorer",
         "title": "MT DevOps: Show Repo Report"
       },
@@ -525,6 +535,16 @@
         },
         {
           "command": "mtDevops.pullAllReposIfBehind",
+          "when": "view == mtDevopsRepoHub",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.createLlmExport",
+          "when": "view == mtDevopsRepoHub",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.viewExports",
           "when": "view == mtDevopsRepoHub",
           "group": "navigation"
         },

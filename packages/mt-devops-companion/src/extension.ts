@@ -15,7 +15,7 @@ import { MinikubeProvider } from "./minikubeProvider";
 import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem, WorkspaceCategoryItem } from "./repoHubProvider";
 import { runAiUpdateFlow, showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
-import { SettingsValueItem, SettingsProvider } from "./settingsProvider";
+import { readConfigValue, SettingsValueItem, SettingsProvider } from "./settingsProvider";
 import { StatusProvider } from "./statusProvider";
 import { checkForUpdates } from "./updateChecker";
 
@@ -617,6 +617,39 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(
       vscode.commands.registerCommand("mtDevops.toggleFavoriteRepo", (item: RepoTreeItem) => repoHubProvider.toggleFavorite(item.repoPath)),
     );
+
+    const configPath = path.join(configDir, "config.yaml");
+
+    // Repo Hub title-bar counterpart to the per-repo "Export for LLM"
+    // action: not repo-scoped by construction (there's no item to
+    // right-click at the view's title bar), so this reuses pickRepoPath's
+    // own "resolve from context, else fall back to whichever repos are
+    // open in the workspace" logic with no uri/active-editor context to
+    // resolve against -- it always falls straight to the open-workspace
+    // fallback (or its warning if nothing's open).
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.createLlmExport", async () => {
+        const repoPath = await pickRepoPath(undefined);
+        if (repoPath) runInTerminal(`cd ${shellQuote(repoPath)} && mt-export -i`);
+      }),
+    );
+    // Opens the real EXPORT_DIR (paths.export_dir in config.yaml, same
+    // value mt-export itself resolves it from) in the OS file
+    // explorer/Finder -- not repo-scoped, since every repo's exports land
+    // in per-project subfolders of the one shared EXPORT_DIR.
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.viewExports", async () => {
+        const exportDir = readConfigValue(configPath, "paths.export_dir");
+        const dir = typeof exportDir === "string" && exportDir ? exportDir : "/tmp/exports";
+        const resolved = dir.startsWith("~") ? path.join(os.homedir(), dir.slice(1)) : dir;
+        if (!fs.existsSync(resolved)) {
+          vscode.window.showInformationMessage(`MT DevOps: no exports yet -- ${resolved} doesn't exist.`);
+          return;
+        }
+        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(resolved));
+      }),
+    );
+
     registerWatchedView(
       context,
       "mtDevopsSecrets",
@@ -627,8 +660,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerWatchedView(
       context,
       "mtDevopsSettings",
-      path.join(configDir, "config.yaml"),
-      new SettingsProvider(path.join(configDir, "config.yaml")),
+      configPath,
+      new SettingsProvider(configPath),
       "mtDevops.refreshSettings",
     );
 
