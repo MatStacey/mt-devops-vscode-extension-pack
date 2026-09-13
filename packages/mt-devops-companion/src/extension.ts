@@ -7,6 +7,7 @@ import { DockerContainerItem, DockerProvider } from "./dockerProvider";
 import { resolveFrameworkPaths, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
+import { LogProvider } from "./logProvider";
 import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem, WorkspaceCategoryItem } from "./repoHubProvider";
 import { showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
@@ -347,7 +348,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerAsyncView(context, "mtDevopsKubernetes", new KubernetesProvider(), "mtDevops.refreshKubernetes");
 
   try {
-    const { cacheDir, configDir, vcsRoot } = await resolveFrameworkPaths();
+    const { cacheDir, configDir, logDir, vcsRoot } = await resolveFrameworkPaths();
 
     // Explorer counterpart to the Repo Hub tree's own click-to-open
     // report -- reads the same .vcs_hub.json cache by exact absolute
@@ -409,6 +410,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       path.join(configDir, "config.yaml"),
       new SettingsProvider(path.join(configDir, "config.yaml")),
       "mtDevops.refreshSettings",
+    );
+
+    // Logs: reads framework.log directly (see logProvider.ts) rather
+    // than shelling out to `mt-logs -j`, since this view auto-refreshes
+    // on every file change and mt-log appends on nearly every framework
+    // command -- a bash -ic round trip per line would be both slow and
+    // wasteful. Clear/Open/Tail still delegate to the real mt-logs
+    // command (or, for Open, VS Code's own editor API) rather than
+    // reimplementing any of that.
+    const logFilePath = path.join(logDir, "framework.log");
+    registerWatchedView(context, "mtDevopsLogs", logFilePath, new LogProvider(logFilePath), "mtDevops.refreshLogs");
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.clearLogs", () => runAndNotify("mt-logs --clear", "MT DevOps: clear failed")),
+      vscode.commands.registerCommand("mtDevops.openLogFile", async () => {
+        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(logFilePath));
+        await vscode.window.showTextDocument(doc);
+      }),
+      vscode.commands.registerCommand("mtDevops.tailLogsInTerminal", () => runInTerminal("mt-logs --follow")),
     );
   } catch (err) {
     vscode.window.showWarningMessage(
