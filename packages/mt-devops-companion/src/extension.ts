@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 import { registerAiChatParticipant } from "./aiChatParticipant";
 import { DoctorProvider } from "./doctorProvider";
 import { DockerContainerItem, DockerProvider } from "./dockerProvider";
-import { resolveFrameworkPaths, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
+import { resolveFrameworkPaths, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { HelmProvider, HelmReleaseItem } from "./helmProvider";
 import { HistoryEntryItem, HistoryProvider } from "./historyProvider";
@@ -497,6 +497,45 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // to the terminal -- no framework flag needed, since the extension
     // already holds the literal command string from mt-history --json.
     vscode.commands.registerCommand("mtDevops.historyRerun", (item: HistoryEntryItem) => runInTerminal(item.command_)),
+
+    // Search Repos: mt-hub --search only ever looks at the already-cached
+    // .vcs_hub.json (name/description/category/stack), same fields
+    // RepoMeta already carries -- so a picked result can go straight into
+    // showRepoReport without a second cache read.
+    vscode.commands.registerCommand("mtDevops.searchRepos", async () => {
+      const term = await vscode.window.showInputBox({ prompt: "Search indexed repos by name, description, category, or stack" });
+      if (!term) return;
+
+      interface SearchResult {
+        path: string;
+        category?: string;
+        description?: string;
+        stack?: string;
+      }
+      let results: SearchResult[];
+      try {
+        results = await runFrameworkJson<SearchResult[]>(`mt-hub --search ${shellQuote(term)} --json`);
+      } catch (err) {
+        vscode.window.showErrorMessage(`MT DevOps: search failed -- ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+      if (results.length === 0) {
+        vscode.window.showInformationMessage(`MT DevOps: no indexed repos match "${term}".`);
+        return;
+      }
+
+      const pick = await vscode.window.showQuickPick(
+        results.map((r) => ({
+          label: path.basename(r.path),
+          description: r.category,
+          detail: r.description,
+          repoPath: r.path,
+          meta: { category: r.category, description: r.description, stack: r.stack } as RepoMeta,
+        })),
+        { placeHolder: `${results.length} match${results.length === 1 ? "" : "es"} for "${term}"` },
+      );
+      if (pick) await showRepoReport(pick.repoPath, pick.meta);
+    }),
   );
 
   registerAiChatParticipant(context);

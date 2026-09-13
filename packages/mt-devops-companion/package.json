@@ -49,6 +49,10 @@
         "title": "MT DevOps: Explain Code (AI)"
       },
       {
+        "command": "mtDevops.searchRepos",
+        "title": "MT DevOps: Search Repos"
+      },
+      {
         "command": "mtDevops.refreshJobs",
         "title": "Refresh",
         "icon": "$(refresh)"
