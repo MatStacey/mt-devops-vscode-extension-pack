@@ -446,7 +446,7 @@
   {
     "id": "mtDevops.catalog.ai_explain",
     "command": "ai-explain",
-    "description": "AI: Explain a terminal command in detail, grounding the explanation in",
+    "description": "AI: Explain a terminal command in detail, grounding the explanation in its",
     "category": "AI Workflows & LLM API Integration"
   },
   {
