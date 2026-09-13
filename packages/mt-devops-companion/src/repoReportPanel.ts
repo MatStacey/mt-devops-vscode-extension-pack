@@ -430,6 +430,17 @@ function buildEnvironmentsHtml(environments: RepoMeta["environments"]): string {
   return `<h2>Environments</h2><div class="environments">${pills}</div>`;
 }
 
+/** Renders __mt_hub_detect_gcp's result -- omitted entirely when nothing was detected, same as buildEnvironmentsHtml, rather than a "No GCP usage" line every non-GCP repo would otherwise show. "source" is surfaced only as a tooltip, not inline text, since "detected via Terraform" vs "detected via config files" matters far less than the fact/services themselves. */
+function buildGcpHtml(gcp: RepoMeta["gcp"]): string {
+  if (!gcp || !gcp.detected) return "";
+  const sourceLabel = gcp.source === "terraform" ? "Detected via Terraform" : "Detected via config files (app.yaml/cloudbuild.yaml/registry references)";
+  const pills =
+    gcp.services.length > 0
+      ? gcp.services.map((s) => `<span class="envPill" style="border-color: var(--vscode-charts-blue);">${escapeHtml(s)}</span>`).join("")
+      : `<span class="envPill" style="border-color: var(--vscode-charts-blue);">GCP</span>`;
+  return `<h2>Google Cloud Platform</h2><div class="environments" title="${escapeHtml(sourceLabel)}">${pills}</div>`;
+}
+
 const CI_ICON: Record<string, string> = { success: "✅", failure: "❌", cancelled: "⏹️", in_progress: "⏳", queued: "⏳" };
 
 function buildGithubHtml(github: GithubStatus | null, webUrl: string | undefined): string {
@@ -578,6 +589,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
   </table>
 
   ${buildEnvironmentsHtml(meta.environments)}
+
+  ${buildGcpHtml(meta.gcp)}
 
   ${buildGithubHtml(data.github, data.remote?.webUrl)}
 

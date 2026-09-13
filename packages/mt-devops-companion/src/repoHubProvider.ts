@@ -8,6 +8,13 @@ export interface RepoEnvironment {
   type: string;
 }
 
+/** From __mt_hub_detect_gcp (.bash.d/20-vcs/53-vcs-insight.sh) -- "source" is "terraform" when a "google"/"google-beta" provider block or any google_* resource type was found (also the only source that ever populates "services", since resource-type prefixes are what map to a human-readable product name), "config-files" for the weaker app.yaml/cloudbuild.yaml/registry-reference fallback, "none" otherwise. */
+export interface RepoGcp {
+  detected: boolean;
+  source: "terraform" | "config-files" | "none";
+  services: string[];
+}
+
 export interface RepoMeta {
   category?: string;
   description?: string;
@@ -16,6 +23,7 @@ export interface RepoMeta {
   cicd?: string;
   testing?: string;
   environments?: RepoEnvironment[];
+  gcp?: RepoGcp;
   last_indexed?: number;
 }
 

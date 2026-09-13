@@ -525,6 +525,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         category?: string;
         description?: string;
         stack?: string;
+        gcp?: RepoMeta["gcp"];
       }
       let results: SearchResult[];
       try {
@@ -544,7 +545,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           description: r.category,
           detail: r.description,
           repoPath: r.path,
-          meta: { category: r.category, description: r.description, stack: r.stack } as RepoMeta,
+          meta: { category: r.category, description: r.description, stack: r.stack, gcp: r.gcp } as RepoMeta,
         })),
         { placeHolder: `${results.length} match${results.length === 1 ? "" : "es"} for "${term}"` },
       );
