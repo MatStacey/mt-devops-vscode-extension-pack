@@ -37,6 +37,18 @@
         "title": "MT DevOps: Copy for LLM"
       },
       {
+        "command": "mtDevops.generateReadme",
+        "title": "MT DevOps: Generate/Update README (AI)"
+      },
+      {
+        "command": "mtDevops.generateGitignore",
+        "title": "MT DevOps: Generate/Update .gitignore (AI)"
+      },
+      {
+        "command": "mtDevops.aiExplainCode",
+        "title": "MT DevOps: Explain Code (AI)"
+      },
+      {
         "command": "mtDevops.refreshJobs",
         "title": "Refresh",
         "icon": "$(refresh)"
@@ -339,6 +351,27 @@
         {
           "command": "mtDevops.updateRepoIndexFromExplorer",
           "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.generateReadme",
+          "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.generateGitignore",
+          "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.aiExplainCode",
+          "when": "!explorerResourceIsFolder",
+          "group": "7_modification"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "mtDevops.aiExplainCode",
           "group": "7_modification"
         }
       ],

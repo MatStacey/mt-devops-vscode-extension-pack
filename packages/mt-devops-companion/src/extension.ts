@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { registerAiChatParticipant } from "./aiChatParticipant";
@@ -11,7 +12,7 @@ import { KubernetesProvider } from "./kubernetesProvider";
 import { LogProvider } from "./logProvider";
 import { MinikubeProvider } from "./minikubeProvider";
 import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem, WorkspaceCategoryItem } from "./repoHubProvider";
-import { showRepoReport } from "./repoReportPanel";
+import { runAiUpdateFlow, showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
 import { SettingsValueItem, SettingsProvider } from "./settingsProvider";
 import { StatusProvider } from "./statusProvider";
@@ -63,6 +64,41 @@ function resolveRepoRootTarget(uri: vscode.Uri | undefined): string | undefined 
     return undefined;
   }
   return folderPath;
+}
+
+/** Open workspace folders that are actually git repos (checks for ".git", same test as resolveRepoRootTarget/mt-hub's own repo detection). */
+function openWorkspaceRepoPaths(): string[] {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  return folders.map((f) => f.uri.fsPath).filter((p) => fs.existsSync(path.join(p, ".git")));
+}
+
+/**
+ * Resolves a repo path for a command that can be invoked either from an
+ * Explorer/editor context (a real `uri`/active file to resolve against, via
+ * resolveRepoRootTarget) or bare from the command palette with no such
+ * context -- in which case it falls back to whichever repos are open in the
+ * workspace: the one open repo if there's exactly one, otherwise a quick
+ * pick, otherwise a warning that nothing's open to target.
+ */
+async function pickRepoPath(uri: vscode.Uri | undefined): Promise<string | undefined> {
+  const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+  if (target) {
+    const folderPath = fs.existsSync(target.fsPath) && fs.statSync(target.fsPath).isDirectory() ? target.fsPath : path.dirname(target.fsPath);
+    if (fs.existsSync(path.join(folderPath, ".git"))) return folderPath;
+  }
+
+  const openRepos = openWorkspaceRepoPaths();
+  if (openRepos.length === 1) return openRepos[0];
+  if (openRepos.length === 0) {
+    vscode.window.showWarningMessage("MT DevOps: no open repository to target -- open one in the workspace first.");
+    return undefined;
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    openRepos.map((p) => ({ label: path.basename(p), description: p, repoPath: p })),
+    { placeHolder: "Select a repository" },
+  );
+  return pick?.repoPath;
 }
 
 /**
@@ -174,6 +210,49 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const repoPath = resolveRepoRootTarget(uri);
       if (!repoPath) return;
       runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}`);
+    }),
+
+    // Command-palette/Explorer counterparts to the Repo Report panel's own
+    // "Generate/Update README"/".gitignore" buttons -- pickRepoPath covers
+    // invocation with no obvious repo context (bare command palette).
+    vscode.commands.registerCommand("mtDevops.generateReadme", async (uri: vscode.Uri | undefined) => {
+      const repoPath = await pickRepoPath(uri);
+      if (repoPath) await runAiUpdateFlow(repoPath, "readme");
+    }),
+    vscode.commands.registerCommand("mtDevops.generateGitignore", async (uri: vscode.Uri | undefined) => {
+      const repoPath = await pickRepoPath(uri);
+      if (repoPath) await runAiUpdateFlow(repoPath, "gitignore");
+    }),
+
+    // AI Explain: a highlighted selection, an untitled/unsaved buffer, a
+    // saved whole file, or an Explorer-right-clicked file -- all funnel
+    // into ai-explain's own -f <file> mode. A selection (or unsaved buffer)
+    // is written to a temp file first since ai-explain reads real files,
+    // not stdin/inline text (avoids the bash -ic variable-expansion pitfall
+    // of inlining arbitrary code content into a shell command string).
+    vscode.commands.registerCommand("mtDevops.aiExplainCode", (uri: vscode.Uri | undefined) => {
+      const editor = vscode.window.activeTextEditor;
+
+      if (uri && (!editor || editor.document.uri.fsPath !== uri.fsPath) && fs.existsSync(uri.fsPath) && fs.statSync(uri.fsPath).isFile()) {
+        runInTerminal(`ai-explain -f ${shellQuote(uri.fsPath)}`);
+        return;
+      }
+
+      if (!editor) {
+        vscode.window.showWarningMessage("MT DevOps: open a file (or right-click one in the Explorer) first.");
+        return;
+      }
+
+      if (!editor.selection.isEmpty || editor.document.isUntitled) {
+        const text = editor.selection.isEmpty ? editor.document.getText() : editor.document.getText(editor.selection);
+        const ext = path.extname(editor.document.fileName) || ".txt";
+        const tempFile = path.join(os.tmpdir(), `mt-ai-explain-${Date.now()}${ext}`);
+        fs.writeFileSync(tempFile, text, "utf8");
+        runInTerminal(`ai-explain -f ${shellQuote(tempFile)}`);
+        return;
+      }
+
+      runInTerminal(`ai-explain -f ${shellQuote(editor.document.uri.fsPath)}`);
     }),
 
     // Docker: single-container actions from the sidebar's context menu.
