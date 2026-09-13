@@ -62,6 +62,26 @@
         "icon": "$(edit)"
       },
       {
+        "command": "mtDevops.refreshLogs",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mtDevops.clearLogs",
+        "title": "Clear Logs",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "mtDevops.openLogFile",
+        "title": "Open Log File",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "mtDevops.tailLogsInTerminal",
+        "title": "Tail in Terminal",
+        "icon": "$(terminal)"
+      },
+      {
         "command": "mtDevops.refreshStatus",
         "title": "Refresh",
         "icon": "$(refresh)"
@@ -222,6 +242,10 @@
           "name": "Settings"
         },
         {
+          "id": "mtDevopsLogs",
+          "name": "Logs"
+        },
+        {
           "id": "mtDevopsStatus",
           "name": "Status"
         },
@@ -309,6 +333,26 @@
         {
           "command": "mtDevops.refreshSettings",
           "when": "view == mtDevopsSettings",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.refreshLogs",
+          "when": "view == mtDevopsLogs",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.tailLogsInTerminal",
+          "when": "view == mtDevopsLogs",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.openLogFile",
+          "when": "view == mtDevopsLogs",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.clearLogs",
+          "when": "view == mtDevopsLogs",
           "group": "navigation"
         },
         {
