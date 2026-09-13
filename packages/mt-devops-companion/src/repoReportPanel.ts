@@ -56,6 +56,28 @@ interface ReportData {
   branches: BranchInfo[];
   behindCount: number;
   readmeHtml: string | null;
+  /** Days the repo's latest commit is newer than the README's last edit, or null if there's no README or no commits to compare against. Only ever positive -- a README edited after the latest commit isn't "stale" by this measure. */
+  readmeStaleDays: number | null;
+  hasDockerCompose: boolean;
+  hasHelmChart: boolean;
+}
+
+/** A Compose file at the repo root -- the same thing DockerProvider's "group by repository" keys off of (com.docker.compose.project.working_dir), so this is "does the Docker panel have anything for this repo", not a generic Docker-usage guess. */
+function detectDockerCompose(repoPath: string): boolean {
+  return ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"].some((name) => fs.existsSync(path.join(repoPath, name)));
+}
+
+/** A Helm chart at the repo root or in a conventional charts/helm subfolder -- not exhaustive (a chart could live anywhere), just the common layouts worth a one-click link rather than a real dependency the Helm panel relies on. */
+function detectHelmChart(repoPath: string): boolean {
+  if (fs.existsSync(path.join(repoPath, "Chart.yaml"))) return true;
+  for (const sub of ["helm", "chart", "charts"]) {
+    const dir = path.join(repoPath, sub);
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
+    if (fs.existsSync(path.join(dir, "Chart.yaml"))) return true;
+    const nested = fs.readdirSync(dir).find((entry) => fs.existsSync(path.join(dir, entry, "Chart.yaml")));
+    if (nested) return true;
+  }
+  return false;
 }
 
 /** Reads the 5 most recent commits via a plain, read-only `git log` -- not framework policy, just a local git query, same as __mt_hub_preview's own bash equivalent. */
@@ -195,6 +217,27 @@ function findReadme(repoPath: string): string | null {
   return readme ? path.join(repoPath, readme) : null;
 }
 
+/**
+ * Days the repo's latest commit is newer than the README's own last
+ * commit, or null if there's no README, no commits at all, or the
+ * README is untracked (never committed, so git has no date for it).
+ * Deliberately uses git's own commit history rather than the README
+ * file's filesystem mtime -- a fresh clone stamps every file's mtime as
+ * the checkout time, not its real last-edit time, which would make an
+ * mtime-based comparison meaningless immediately after cloning.
+ */
+async function readReadmeStaleDays(repoPath: string, readmePath: string | null): Promise<number | null> {
+  if (!readmePath) return null;
+  const [latestRaw, readmeRaw] = await Promise.all([
+    runGit(repoPath, ["log", "-1", "--format=%ct"]),
+    runGit(repoPath, ["log", "-1", "--format=%ct", "--", path.basename(readmePath)]),
+  ]);
+  const latest = Number(latestRaw);
+  const readmeDate = Number(readmeRaw);
+  if (!Number.isFinite(latest) || !readmeRaw || !Number.isFinite(readmeDate)) return null;
+  return Math.max(0, Math.floor((latest - readmeDate) / 86400));
+}
+
 /** Only these URL schemes (plus scheme-relative/relative paths) are allowed in a README's rendered links/images; anything else (e.g. "javascript:") is replaced with "#" rather than passed through. */
 function sanitizeHref(href: string): string {
   if (/^(https?:|mailto:)/i.test(href)) return href;
@@ -248,16 +291,28 @@ async function collectReportData(repoPath: string): Promise<ReportData> {
   const remoteUrl = await runGit(repoPath, ["remote", "get-url", "origin"]);
   const remote = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
 
-  const [commits, localBranches, remoteBranches, behindCount, readmeHtml] = await Promise.all([
+  const readmePath = findReadme(repoPath);
+
+  const [commits, localBranches, remoteBranches, behindCount, readmeHtml, readmeStaleDays] = await Promise.all([
     readRecentCommits(repoPath),
     readLocalBranches(repoPath),
     readRemoteBranches(repoPath),
     readBehindCount(repoPath),
     renderReadme(repoPath),
+    readReadmeStaleDays(repoPath, readmePath),
   ]);
 
   const branches = remoteBranches.map((b) => ({ ...b, hasLocal: localBranches.has(b.name) }));
-  return { commits, remote, branches, behindCount, readmeHtml };
+  return {
+    commits,
+    remote,
+    branches,
+    behindCount,
+    readmeHtml,
+    readmeStaleDays,
+    hasDockerCompose: detectDockerCompose(repoPath),
+    hasHelmChart: detectHelmChart(repoPath),
+  };
 }
 
 function escapeHtml(value: string): string {
@@ -327,8 +382,14 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
       ? `<button id="pullBtn">Update (Pull ${data.behindCount} commit${data.behindCount === 1 ? "" : "s"})</button>`
       : "";
 
+  const README_STALE_THRESHOLD_DAYS = 30;
+  const readmeStaleWarning =
+    data.readmeStaleDays !== null && data.readmeStaleDays > README_STALE_THRESHOLD_DAYS
+      ? `<div class="staleWarning">⚠️ README hasn't been touched in ${data.readmeStaleDays} days, though the codebase has moved on since -- consider Generate/Update README below.</div>`
+      : "";
+
   const readmeSection = data.readmeHtml
-    ? `<h2>README</h2><div class="readme">${data.readmeHtml}</div>`
+    ? `<h2>README</h2>${readmeStaleWarning}<div class="readme">${data.readmeHtml}</div>`
     : "";
 
   const remoteRow = data.remote
@@ -379,6 +440,7 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
   #openBtn { margin-top: 0; }
   .environments { display: flex; flex-wrap: wrap; gap: 8px; }
   .envPill { border: 1px solid; border-radius: 12px; padding: 3px 10px; font-size: 0.9em; }
+  .staleWarning { background: var(--vscode-inputValidation-warningBackground); border: 1px solid var(--vscode-inputValidation-warningBorder); padding: 8px 12px; border-radius: 3px; margin-bottom: 10px; font-size: 0.9em; }
 </style>
 </head>
 <body>
@@ -413,6 +475,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     <button id="updateIndexBtn">Update Missing Index</button>
     <button id="generateReadmeBtn">Generate/Update README</button>
     <button id="generateGitignoreBtn">Generate/Update .gitignore</button>
+    ${data.hasDockerCompose ? `<button id="viewDockerBtn">View in Docker Panel</button>` : ""}
+    ${data.hasHelmChart ? `<button id="viewHelmBtn">View in Helm Panel</button>` : ""}
   </div>
 
   ${readmeSection}
@@ -455,6 +519,18 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     if (remoteRow) {
       remoteRow.addEventListener("click", () => {
         vscode.postMessage({ command: "openInBrowser" });
+      });
+    }
+    const viewDockerBtn = document.getElementById("viewDockerBtn");
+    if (viewDockerBtn) {
+      viewDockerBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "viewInDocker" });
+      });
+    }
+    const viewHelmBtn = document.getElementById("viewHelmBtn");
+    if (viewHelmBtn) {
+      viewHelmBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "viewInHelm" });
       });
     }
     (function () {
@@ -611,6 +687,18 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
         }
         if (message.command === "generateGitignore") {
           await runAiUpdateFlow(displayedRepoPath, "gitignore");
+          return;
+        }
+        // Each view contribution gets a VS Code-generated "<viewId>.focus"
+        // command automatically -- just navigation, not a repo-filtered
+        // view (the Docker/Helm panels don't take a repo argument), so
+        // there's nothing more to pass through here.
+        if (message.command === "viewInDocker") {
+          await vscode.commands.executeCommand("mtDevopsDocker.focus");
+          return;
+        }
+        if (message.command === "viewInHelm") {
+          await vscode.commands.executeCommand("mtDevopsHelm.focus");
           return;
         }
         if (message.command === "pullRepo") {

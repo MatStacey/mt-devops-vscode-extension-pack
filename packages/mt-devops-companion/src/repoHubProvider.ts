@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
@@ -47,10 +48,13 @@ export class RepoTreeItem extends vscode.TreeItem {
   constructor(
     public readonly repoPath: string,
     public readonly meta: RepoMeta,
+    dirty = false,
   ) {
     super(path.basename(repoPath), vscode.TreeItemCollapsibleState.None);
-    this.description = meta.stack || meta.category || "";
-    this.iconPath = new vscode.ThemeIcon("repo");
+    this.description = [meta.stack || meta.category || "", dirty ? "●" : ""].filter(Boolean).join("  ");
+    this.iconPath = dirty
+      ? new vscode.ThemeIcon("repo", new vscode.ThemeColor("gitDecoration.modifiedResourceForeground"))
+      : new vscode.ThemeIcon("repo");
     this.tooltip = new vscode.MarkdownString(
       `**${repoPath}**\n\n` +
         `${meta.description || "No description available."}\n\n` +
@@ -58,7 +62,8 @@ export class RepoTreeItem extends vscode.TreeItem {
         `- Stack: ${meta.stack ?? "Unknown"}\n` +
         `- Build: ${meta.build ?? "None"}\n` +
         `- CI/CD: ${meta.cicd ?? "None"}\n` +
-        `- Testing: ${meta.testing ?? "None"}`,
+        `- Testing: ${meta.testing ?? "None"}` +
+        (dirty ? `\n\n⚠️ Has uncommitted changes` : ""),
     );
     this.contextValue = "mtDevopsRepo";
     // Clicking opens the report/summary view (repoReportPanel) rather than
@@ -109,6 +114,50 @@ class RepoErrorItem extends vscode.TreeItem {
     super(message, vscode.TreeItemCollapsibleState.None);
     this.iconPath = new vscode.ThemeIcon("error");
   }
+}
+
+/**
+ * A plain, non-interactive dashboard line at the top of the tree -- the
+ * closest thing to a "header" a VS Code TreeView has, since the API
+ * itself has no dedicated header slot. Deliberately cheap-only: no live
+ * "N behind" count here, since that needs a real network fetch per repo
+ * (see mt-bulk-update) and this renders on every tree refresh.
+ */
+class SummaryItem extends vscode.TreeItem {
+  constructor(total: number, needsIndex: number, dirty: number) {
+    const parts = [`${total} indexed repo${total === 1 ? "" : "s"}`];
+    if (needsIndex > 0) parts.push(`${needsIndex} need${needsIndex === 1 ? "s" : ""} indexing`);
+    if (dirty > 0) parts.push(`${dirty} dirty`);
+    super(parts.join(" · "), vscode.TreeItemCollapsibleState.None);
+    this.iconPath = new vscode.ThemeIcon("dashboard");
+  }
+}
+
+/**
+ * Same gap definition as the framework's own __mt_hub_load_existing_keys
+ * (.bash.d/20-vcs/53-vcs-insight.sh) -- category/description never came
+ * back from the AI, or the stack heuristic found nothing. Mirrored here
+ * (not read from the framework) since it's a pure function of already-
+ * cached data with no shell-out involved.
+ */
+function hasIndexGap(meta: RepoMeta): boolean {
+  return (
+    !meta.category ||
+    meta.category === "Unknown" ||
+    !meta.description ||
+    meta.description === "No description available." ||
+    !meta.stack ||
+    meta.stack === "Unknown"
+  );
+}
+
+/** Whether a repo has uncommitted changes -- resolves false (not an error) if git itself fails, e.g. a repo mid-rebase or otherwise transiently unreadable. */
+function isDirty(repoPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile("git", ["-C", repoPath, "status", "--porcelain"], { maxBuffer: 1024 * 1024 }, (error, stdout) => {
+      resolve(!error && stdout.trim().length > 0);
+    });
+  });
 }
 
 /**
@@ -171,7 +220,14 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
     return element;
   }
 
-  getChildren(element?: RepoCategoryItem | WorkspaceCategoryItem): vscode.TreeItem[] {
+  async getChildren(element?: RepoCategoryItem | WorkspaceCategoryItem): Promise<vscode.TreeItem[]> {
+    if (element instanceof WorkspaceCategoryItem) {
+      // Only ever a handful of repos (whatever's actually open), so a
+      // live `git status` per repo here is cheap -- doing the same for
+      // every repo in the full category tree below would not be.
+      const dirtyFlags = await Promise.all(element.repos.map(([repoPath]) => isDirty(repoPath)));
+      return element.repos.map(([repoPath, meta], i) => new RepoTreeItem(repoPath, meta, dirtyFlags[i]));
+    }
     if (element) {
       return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta));
     }
@@ -179,7 +235,13 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
       const cacheEntries = parseRepoHub(this.hubFilePath);
       const openRepos = findOpenWorkspaceRepos(cacheEntries);
       const workspaceSection = openRepos.length > 0 ? [new WorkspaceCategoryItem(openRepos)] : [];
-      return [...workspaceSection, ...groupByCategory(cacheEntries, this.vcsRoot)];
+
+      const needsIndex = cacheEntries.filter(([, meta]) => hasIndexGap(meta)).length;
+      const openDirtyFlags = await Promise.all(openRepos.map(([repoPath]) => isDirty(repoPath)));
+      const dirtyCount = openDirtyFlags.filter(Boolean).length;
+      const summary = new SummaryItem(cacheEntries.length, needsIndex, dirtyCount);
+
+      return [summary, ...workspaceSection, ...groupByCategory(cacheEntries, this.vcsRoot)];
     } catch (err) {
       return [new RepoErrorItem(err instanceof Error ? err.message : String(err))];
     }
