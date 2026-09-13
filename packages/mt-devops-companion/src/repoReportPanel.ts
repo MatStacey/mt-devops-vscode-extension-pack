@@ -442,6 +442,18 @@ function buildGcpHtml(gcp: RepoMeta["gcp"]): string {
   return `<h2>Google Cloud Platform</h2><div class="environments" title="${escapeHtml(sourceLabel)}">${pills}</div>`;
 }
 
+/** Renders __mt_hub_detect_top_contributors's result -- omitted entirely when empty (no commits in the lookback window), same convention as buildEnvironmentsHtml/buildGcpHtml. Already ordered highest-commits-first by the framework, so no re-sorting here. */
+function buildTopContributorsHtml(contributors: RepoMeta["top_contributors"]): string {
+  if (!contributors || contributors.length === 0) return "";
+  const rows = contributors
+    .map(
+      (c) =>
+        `<tr><td>${escapeHtml(c.name)}</td><td>${c.commits}</td><td>${escapeHtml(new Date(c.last_commit * 1000).toLocaleDateString())}</td></tr>`,
+    )
+    .join("");
+  return `<h2>Top Contributors</h2><table><tr><th class="label">Name</th><th class="label">Commits</th><th class="label">Last Commit</th></tr>${rows}</table>`;
+}
+
 const CI_ICON: Record<string, string> = { success: "✅", failure: "❌", cancelled: "⏹️", in_progress: "⏳", queued: "⏳" };
 
 function buildGithubHtml(github: GithubStatus | null, webUrl: string | undefined): string {
@@ -592,6 +604,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
   ${buildEnvironmentsHtml(meta.environments)}
 
   ${buildGcpHtml(meta.gcp)}
+
+  ${buildTopContributorsHtml(meta.top_contributors)}
 
   ${buildGithubHtml(data.github, data.remote?.webUrl)}
 
