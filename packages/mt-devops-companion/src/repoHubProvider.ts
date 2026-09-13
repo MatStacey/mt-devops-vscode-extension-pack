@@ -2,6 +2,11 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
+export interface RepoEnvironment {
+  name: string;
+  type: string;
+}
+
 export interface RepoMeta {
   category?: string;
   description?: string;
@@ -9,6 +14,7 @@ export interface RepoMeta {
   build?: string;
   cicd?: string;
   testing?: string;
+  environments?: RepoEnvironment[];
   last_indexed?: number;
 }
 

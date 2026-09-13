@@ -1,4 +1,5 @@
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { registerAiChatParticipant } from "./aiChatParticipant";
@@ -7,11 +8,12 @@ import { DockerContainerItem, DockerProvider } from "./dockerProvider";
 import { resolveFrameworkPaths, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { HelmProvider, HelmReleaseItem } from "./helmProvider";
+import { HistoryEntryItem, HistoryProvider } from "./historyProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
 import { LogProvider } from "./logProvider";
 import { MinikubeProvider } from "./minikubeProvider";
 import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem, WorkspaceCategoryItem } from "./repoHubProvider";
-import { showRepoReport } from "./repoReportPanel";
+import { runAiUpdateFlow, showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
 import { SettingsValueItem, SettingsProvider } from "./settingsProvider";
 import { StatusProvider } from "./statusProvider";
@@ -63,6 +65,41 @@ function resolveRepoRootTarget(uri: vscode.Uri | undefined): string | undefined 
     return undefined;
   }
   return folderPath;
+}
+
+/** Open workspace folders that are actually git repos (checks for ".git", same test as resolveRepoRootTarget/mt-hub's own repo detection). */
+function openWorkspaceRepoPaths(): string[] {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  return folders.map((f) => f.uri.fsPath).filter((p) => fs.existsSync(path.join(p, ".git")));
+}
+
+/**
+ * Resolves a repo path for a command that can be invoked either from an
+ * Explorer/editor context (a real `uri`/active file to resolve against, via
+ * resolveRepoRootTarget) or bare from the command palette with no such
+ * context -- in which case it falls back to whichever repos are open in the
+ * workspace: the one open repo if there's exactly one, otherwise a quick
+ * pick, otherwise a warning that nothing's open to target.
+ */
+async function pickRepoPath(uri: vscode.Uri | undefined): Promise<string | undefined> {
+  const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+  if (target) {
+    const folderPath = fs.existsSync(target.fsPath) && fs.statSync(target.fsPath).isDirectory() ? target.fsPath : path.dirname(target.fsPath);
+    if (fs.existsSync(path.join(folderPath, ".git"))) return folderPath;
+  }
+
+  const openRepos = openWorkspaceRepoPaths();
+  if (openRepos.length === 1) return openRepos[0];
+  if (openRepos.length === 0) {
+    vscode.window.showWarningMessage("MT DevOps: no open repository to target -- open one in the workspace first.");
+    return undefined;
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    openRepos.map((p) => ({ label: path.basename(p), description: p, repoPath: p })),
+    { placeHolder: "Select a repository" },
+  );
+  return pick?.repoPath;
 }
 
 /**
@@ -174,6 +211,55 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const repoPath = resolveRepoRootTarget(uri);
       if (!repoPath) return;
       runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}`);
+    }),
+
+    // Command-palette/Explorer counterparts to the Repo Report panel's own
+    // "Generate/Update README"/".gitignore" buttons -- pickRepoPath covers
+    // invocation with no obvious repo context (bare command palette).
+    vscode.commands.registerCommand("mtDevops.generateReadme", async (uri: vscode.Uri | undefined) => {
+      const repoPath = await pickRepoPath(uri);
+      if (repoPath) await runAiUpdateFlow(repoPath, "readme");
+    }),
+    vscode.commands.registerCommand("mtDevops.generateGitignore", async (uri: vscode.Uri | undefined) => {
+      const repoPath = await pickRepoPath(uri);
+      if (repoPath) await runAiUpdateFlow(repoPath, "gitignore");
+    }),
+
+    // AI Explain: a highlighted selection, an untitled/unsaved buffer, a
+    // saved whole file, or an Explorer-right-clicked file -- all funnel
+    // into ai-explain's own -f <file> mode. A selection (or unsaved buffer)
+    // is written to a temp file first since ai-explain reads real files,
+    // not stdin/inline text (avoids the bash -ic variable-expansion pitfall
+    // of inlining arbitrary code content into a shell command string).
+    vscode.commands.registerCommand("mtDevops.aiExplainCode", (uri: vscode.Uri | undefined) => {
+      const editor = vscode.window.activeTextEditor;
+
+      if (uri && (!editor || editor.document.uri.fsPath !== uri.fsPath) && fs.existsSync(uri.fsPath) && fs.statSync(uri.fsPath).isFile()) {
+        runInTerminal(`ai-explain -f ${shellQuote(uri.fsPath)}`);
+        return;
+      }
+
+      if (!editor) {
+        vscode.window.showWarningMessage("MT DevOps: open a file (or right-click one in the Explorer) first.");
+        return;
+      }
+
+      if (!editor.selection.isEmpty || editor.document.isUntitled) {
+        const text = editor.selection.isEmpty ? editor.document.getText() : editor.document.getText(editor.selection);
+        const ext = path.extname(editor.document.fileName) || ".txt";
+        // mkdtemp (not a Date.now()-named file directly under the shared,
+        // world-writable os.tmpdir()) gives a private, non-guessable,
+        // 0700 directory -- a predictable path there would let another
+        // local user read the code snippet or race to plant a symlink at
+        // that path before this write lands.
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mt-ai-explain-"));
+        const tempFile = path.join(tempDir, `snippet${ext}`);
+        fs.writeFileSync(tempFile, text, "utf8");
+        runInTerminal(`ai-explain -f ${shellQuote(tempFile)}`);
+        return;
+      }
+
+      runInTerminal(`ai-explain -f ${shellQuote(editor.document.uri.fsPath)}`);
     }),
 
     // Docker: single-container actions from the sidebar's context menu.
@@ -349,6 +435,68 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         .join(" && ");
       runInTerminal(command);
     }),
+
+    // Pull-if-behind: mt-bulk-update's own fast-forward-only logic already
+    // reports UNCHANGED for a repo with nothing to pull, so there's no
+    // separate "only if behind" flag to pass -- this is just the
+    // fast-forward-only pull itself, run visibly since it's a real network
+    // fetch per repo. --repo bypasses the scope/provider/workspace/project
+    // filter tree entirely for a single known path; the category/workspace
+    // variants chain one invocation per repo the same way
+    // indexWorkspaceRepos does, since mt-bulk-update's own -s scope filter
+    // happens to line up with the Repo Hub category name (the VCS_ROOT
+    // subfolder) but has nothing equivalent for the synthetic "Open in VS
+    // Code" grouping.
+    vscode.commands.registerCommand("mtDevops.pullRepoIfBehind", (item: RepoTreeItem) =>
+      runInTerminal(`mt-bulk-update --repo ${shellQuote(item.repoPath)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.pullCategoryIfBehind", (item: RepoCategoryItem) =>
+      runInTerminal(`mt-bulk-update -s ${shellQuote(item.category.toLowerCase())}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.pullWorkspaceReposIfBehind", (item: WorkspaceCategoryItem) => {
+      const command = item.repos.map(([repoPath]) => `mt-bulk-update --repo ${shellQuote(repoPath)}`).join(" && ");
+      runInTerminal(command);
+    }),
+    vscode.commands.registerCommand("mtDevops.pullAllReposIfBehind", async () => {
+      const choice = await vscode.window.showWarningMessage(
+        "Pull every repo under VCS_ROOT that's behind its remote? This fetches every repo -- never pushes, never force-merges.",
+        { modal: true },
+        "Pull All",
+      );
+      if (choice === "Pull All") runInTerminal("mt-bulk-update");
+    }),
+
+    // Push All Changes: git-ai-push-all formats, AI-groups/commits, and
+    // pushes unconditionally with no confirmation of its own -- unlike the
+    // pull actions above, this genuinely publishes to the remote, so it
+    // gets the same confirm-first treatment as indexAllRepos/
+    // pullAllReposIfBehind rather than running immediately on click.
+    vscode.commands.registerCommand("mtDevops.pushAllChanges", async (item: RepoTreeItem) => {
+      const choice = await vscode.window.showWarningMessage(
+        `Format, AI-commit, and push all changes in "${path.basename(item.repoPath)}"?`,
+        { modal: true },
+        "Push",
+      );
+      if (choice === "Push") runInTerminal(`cd ${shellQuote(item.repoPath)} && git-ai-push-all`);
+    }),
+
+    // mt-export's own -i flow already prompts for every option (dir,
+    // schema, exclusions, zip) interactively, so this just points it at
+    // the right starting directory and lets that flow run in a visible
+    // terminal -- same reasoning as indexRepo/updateRepo's own
+    // shell-outs.
+    vscode.commands.registerCommand("mtDevops.exportForLLM", (item: RepoTreeItem) =>
+      runInTerminal(`cd ${shellQuote(item.repoPath)} && mt-export -i`),
+    ),
+    // Cleanup isn't repo-scoped (it clears mt-export's own output
+    // directory, wherever AI_WORKSPACE_DIR/config.yaml points it), so
+    // this is command-palette-only rather than a per-repo action.
+    vscode.commands.registerCommand("mtDevops.exportCleanup", () => runInTerminal("mt-export-cleanup -i")),
+
+    // History: re-running is just re-sending the exact prior command text
+    // to the terminal -- no framework flag needed, since the extension
+    // already holds the literal command string from mt-history --json.
+    vscode.commands.registerCommand("mtDevops.historyRerun", (item: HistoryEntryItem) => runInTerminal(item.command_)),
   );
 
   registerAiChatParticipant(context);
@@ -370,6 +518,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerAsyncView(context, "mtDevopsKubernetes", new KubernetesProvider(), "mtDevops.refreshKubernetes");
   registerAsyncView(context, "mtDevopsHelm", new HelmProvider(), "mtDevops.refreshHelm");
   registerAsyncView(context, "mtDevopsMinikube", new MinikubeProvider(), "mtDevops.refreshMinikube");
+  registerAsyncView(context, "mtDevopsHistory", new HistoryProvider(), "mtDevops.refreshHistory");
 
   try {
     const { cacheDir, configDir, logDir, vcsRoot } = await resolveFrameworkPaths();

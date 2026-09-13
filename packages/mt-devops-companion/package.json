@@ -37,6 +37,18 @@
         "title": "MT DevOps: Copy for LLM"
       },
       {
+        "command": "mtDevops.generateReadme",
+        "title": "MT DevOps: Generate/Update README (AI)"
+      },
+      {
+        "command": "mtDevops.generateGitignore",
+        "title": "MT DevOps: Generate/Update .gitignore (AI)"
+      },
+      {
+        "command": "mtDevops.aiExplainCode",
+        "title": "MT DevOps: Explain Code (AI)"
+      },
+      {
         "command": "mtDevops.refreshJobs",
         "title": "Refresh",
         "icon": "$(refresh)"
@@ -178,8 +190,23 @@
       },
       {
         "command": "mtDevops.updateRepo",
-        "title": "Update This Repo (fill gaps only)",
+        "title": "Update Missing Index",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "mtDevops.pullRepoIfBehind",
+        "title": "Pull if Behind",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "mtDevops.pushAllChanges",
+        "title": "Push All Changes (AI)",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "mtDevops.exportForLLM",
+        "title": "Export for LLM",
+        "icon": "$(export)"
       },
       {
         "command": "mtDevops.indexCategory",
@@ -188,8 +215,13 @@
       },
       {
         "command": "mtDevops.updateCategory",
-        "title": "Update All in Category (fill gaps only)",
+        "title": "Update Missing Indexes in Category",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "mtDevops.pullCategoryIfBehind",
+        "title": "Pull All if Behind",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "mtDevops.indexWorkspaceRepos",
@@ -198,8 +230,13 @@
       },
       {
         "command": "mtDevops.updateWorkspaceRepos",
-        "title": "Update All Open Repos (fill gaps only)",
+        "title": "Update Missing Indexes in Open Repos",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "mtDevops.pullWorkspaceReposIfBehind",
+        "title": "Pull if Behind",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "mtDevops.indexAllRepos",
@@ -208,8 +245,17 @@
       },
       {
         "command": "mtDevops.updateAllRepos",
-        "title": "Update All Repos (fill gaps only)",
+        "title": "Update Missing Indexes",
         "icon": "$(sparkle)"
+      },
+      {
+        "command": "mtDevops.pullAllReposIfBehind",
+        "title": "Pull All Repos (if Behind)",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "mtDevops.exportCleanup",
+        "title": "MT DevOps: Cleanup LLM Exports"
       },
       {
         "command": "mtDevops.showRepoReportFromExplorer",
@@ -221,7 +267,7 @@
       },
       {
         "command": "mtDevops.updateRepoIndexFromExplorer",
-        "title": "MT DevOps: Update Repo Index (fill gaps only)"
+        "title": "MT DevOps: Update Missing Index"
       },
       {
         "command": "mtDevops.secretAdd",
@@ -232,6 +278,16 @@
         "command": "mtDevops.secretDelete",
         "title": "Delete Secret",
         "icon": "$(trash)"
+      },
+      {
+        "command": "mtDevops.refreshHistory",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mtDevops.historyRerun",
+        "title": "Re-run",
+        "icon": "$(debug-rerun)"
       }
     ],
     "viewsContainers": {
@@ -288,6 +344,10 @@
         {
           "id": "mtDevopsMinikube",
           "name": "Minikube"
+        },
+        {
+          "id": "mtDevopsHistory",
+          "name": "History"
         }
       ]
     },
@@ -339,6 +399,27 @@
         {
           "command": "mtDevops.updateRepoIndexFromExplorer",
           "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.generateReadme",
+          "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.generateGitignore",
+          "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.aiExplainCode",
+          "when": "!explorerResourceIsFolder",
+          "group": "7_modification"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "mtDevops.aiExplainCode",
           "group": "7_modification"
         }
       ],
@@ -432,6 +513,16 @@
           "command": "mtDevops.indexAllRepos",
           "when": "view == mtDevopsRepoHub",
           "group": "navigation"
+        },
+        {
+          "command": "mtDevops.pullAllReposIfBehind",
+          "when": "view == mtDevopsRepoHub",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.refreshHistory",
+          "when": "view == mtDevopsHistory",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -491,6 +582,21 @@
           "group": "2_index@2"
         },
         {
+          "command": "mtDevops.pullRepoIfBehind",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "3_sync@1"
+        },
+        {
+          "command": "mtDevops.pushAllChanges",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "3_sync@2"
+        },
+        {
+          "command": "mtDevops.exportForLLM",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "3_sync@3"
+        },
+        {
           "command": "mtDevops.indexCategory",
           "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
           "group": "2_index@1"
@@ -501,6 +607,11 @@
           "group": "2_index@2"
         },
         {
+          "command": "mtDevops.pullCategoryIfBehind",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
+          "group": "3_sync@1"
+        },
+        {
           "command": "mtDevops.indexWorkspaceRepos",
           "when": "view == mtDevopsRepoHub && viewItem == mtDevopsWorkspaceCategory",
           "group": "2_index@1"
@@ -509,6 +620,11 @@
           "command": "mtDevops.updateWorkspaceRepos",
           "when": "view == mtDevopsRepoHub && viewItem == mtDevopsWorkspaceCategory",
           "group": "2_index@2"
+        },
+        {
+          "command": "mtDevops.pullWorkspaceReposIfBehind",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsWorkspaceCategory",
+          "group": "3_sync@1"
         },
         {
           "command": "mtDevops.secretAdd",
@@ -529,6 +645,11 @@
           "command": "mtDevops.helmUninstall",
           "when": "view == mtDevopsHelm && viewItem == mtDevopsHelmRelease",
           "group": "9_cleanup"
+        },
+        {
+          "command": "mtDevops.historyRerun",
+          "when": "view == mtDevopsHistory && viewItem == mtDevopsHistoryEntry",
+          "group": "1_manage@1"
         }
       ]
     }

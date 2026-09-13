@@ -4,8 +4,16 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
-import { runInTerminal, shellQuote } from "./framework";
+import { openNewTerminalAt, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote } from "./framework";
 import type { RepoMeta } from "./repoHubProvider";
+
+/** Same badge-style palette as other status-coded pills elsewhere in this webview, keyed by mt-hub's AI-inferred environment "type" vocabulary. */
+const ENV_TYPE_COLOR: Record<string, string> = {
+  dev: "var(--vscode-charts-blue)",
+  staging: "var(--vscode-charts-yellow)",
+  prod: "var(--vscode-charts-red)",
+  test: "var(--vscode-charts-purple)",
+};
 
 interface CommitEntry {
   hash: string;
@@ -23,7 +31,24 @@ interface RemoteInfo {
 interface BranchInfo {
   name: string;
   hasLocal: boolean;
+  lastCommitDate: number;
 }
+
+/** Remote branches are paginated client-side at this size once a repo has more than one page's worth. */
+const BRANCHES_PER_PAGE = 10;
+
+interface AiUpdateResult {
+  status: "generated" | "pending";
+  target: string;
+  pending: string | null;
+}
+
+const AI_UPDATE_KINDS = {
+  readme: { command: "mt-ai-readme", label: "README" },
+  gitignore: { command: "mt-ai-gitignore", label: ".gitignore" },
+} as const;
+
+export type AiUpdateKind = keyof typeof AI_UPDATE_KINDS;
 
 interface ReportData {
   commits: CommitEntry[];
@@ -128,14 +153,33 @@ function isSafeBranchName(name: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9/_.-]*$/.test(name);
 }
 
-/** Remote-tracking branch names under origin/, with the "origin/" prefix stripped and origin/HEAD excluded. */
-async function readRemoteBranches(repoPath: string): Promise<string[]> {
-  const output = await runGit(repoPath, ["branch", "-r", "--format=%(refname:short)"]);
+/**
+ * Remote-tracking branches under origin/, newest-committed-first (git's own
+ * --sort=-committerdate, not a client-side sort), with the "origin/" prefix
+ * stripped and origin/HEAD excluded.
+ */
+async function readRemoteBranches(repoPath: string): Promise<Array<{ name: string; lastCommitDate: number }>> {
+  const output = await runGit(repoPath, [
+    "for-each-ref",
+    "--sort=-committerdate",
+    "refs/remotes/origin",
+    "--format=%(refname)%09%(refname:short)%09%(committerdate:unix)",
+  ]);
   if (!output) return [];
   return output
     .split("\n")
-    .map((line) => line.replace(/^origin\//, ""))
-    .filter((name) => name && name !== "HEAD" && isSafeBranchName(name));
+    .map((line) => {
+      const [refname, rawShort, rawDate] = line.split("\t");
+      return { refname, name: rawShort.replace(/^origin\//, ""), lastCommitDate: Number(rawDate) || 0 };
+    })
+    // origin/HEAD is a symbolic ref, not a real branch -- its refname:short
+    // collapses to the bare "origin" (verified: `git branch -r --format=
+    // %(refname:short)` prints the same thing), not "HEAD", which the
+    // previous name-based filter here missed entirely; matching on the
+    // full, unambiguous refname instead of guessing at its shortened form
+    // is what actually excludes it.
+    .filter((b) => b.refname !== "refs/remotes/origin/HEAD" && b.name && isSafeBranchName(b.name))
+    .map(({ name, lastCommitDate }) => ({ name, lastCommitDate }));
 }
 
 /** How many commits the current branch is behind its upstream, or 0 if there's no upstream (e.g. a detached HEAD or a branch never pushed). */
@@ -204,7 +248,7 @@ async function collectReportData(repoPath: string): Promise<ReportData> {
   const remoteUrl = await runGit(repoPath, ["remote", "get-url", "origin"]);
   const remote = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
 
-  const [commits, localBranches, remoteBranchNames, behindCount, readmeHtml] = await Promise.all([
+  const [commits, localBranches, remoteBranches, behindCount, readmeHtml] = await Promise.all([
     readRecentCommits(repoPath),
     readLocalBranches(repoPath),
     readRemoteBranches(repoPath),
@@ -212,7 +256,7 @@ async function collectReportData(repoPath: string): Promise<ReportData> {
     renderReadme(repoPath),
   ]);
 
-  const branches = remoteBranchNames.map((name) => ({ name, hasLocal: localBranches.has(name) }));
+  const branches = remoteBranches.map((b) => ({ ...b, hasLocal: localBranches.has(b.name) }));
   return { commits, remote, branches, behindCount, readmeHtml };
 }
 
@@ -227,6 +271,20 @@ function escapeHtml(value: string): string {
 
 function metaRow(label: string, value: string): string {
   return `<tr><td class="label">${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`;
+}
+
+function buildEnvironmentsHtml(environments: RepoMeta["environments"]): string {
+  if (!environments || environments.length === 0) return "";
+  const pills = environments
+    .map((env) => {
+      const color = ENV_TYPE_COLOR[env.type.toLowerCase()] ?? "var(--vscode-badge-background)";
+      return (
+        `<span class="envPill" style="border-color: ${color};">` +
+        `<strong>${escapeHtml(env.name)}</strong> <span class="dim">${escapeHtml(env.type)}</span></span>`
+      );
+    })
+    .join("");
+  return `<h2>Environments</h2><div class="environments">${pills}</div>`;
 }
 
 function buildCommitsHtml(commits: CommitEntry[], remote: RemoteInfo | null): string {
@@ -244,11 +302,13 @@ function buildCommitsHtml(commits: CommitEntry[], remote: RemoteInfo | null): st
 function buildBranchesHtml(branches: BranchInfo[]): string {
   if (!branches.length) return "<li class='dim'>No remote branches found.</li>";
   return branches
-    .map((b) => {
+    .map((b, i) => {
       const action = b.hasLocal
         ? `<span class="dim">Already local</span>`
         : `<button class="fetchBtn" data-branch="${escapeHtml(b.name)}">Fetch</button>`;
-      return `<li><code>${escapeHtml(b.name)}</code> ${action}</li>`;
+      const page = Math.floor(i / BRANCHES_PER_PAGE);
+      const hidden = page === 0 ? "" : ' style="display:none"';
+      return `<li data-page="${page}"${hidden}><code>${escapeHtml(b.name)}</code> ${action}</li>`;
     })
     .join("");
 }
@@ -271,6 +331,19 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     ? `<h2>README</h2><div class="readme">${data.readmeHtml}</div>`
     : "";
 
+  const remoteRow = data.remote
+    ? `<div class="remote" id="remoteRow" title="Open in browser">${escapeHtml(data.remote.webUrl)}</div>`
+    : "";
+
+  const paginationControls =
+    data.branches.length > BRANCHES_PER_PAGE
+      ? `<div class="pagination">
+           <button id="branchPrevBtn">◀ Prev</button>
+           <span id="branchPageLabel" class="dim"></span>
+           <button id="branchNextBtn">Next ▶</button>
+         </div>`
+      : "";
+
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -279,7 +352,10 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
 <style>
   body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 0 24px 24px; }
   h1 { font-size: 1.4em; word-break: break-all; }
-  .path { color: var(--vscode-descriptionForeground); font-size: 0.9em; margin-top: -8px; word-break: break-all; }
+  .path, .remote { color: var(--vscode-descriptionForeground); font-size: 0.9em; word-break: break-all; cursor: pointer; }
+  .path { margin-top: -8px; }
+  .path:hover, .remote:hover { text-decoration: underline; color: var(--vscode-textLink-foreground); }
+  .pagination { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
   .description { font-size: 1.05em; margin: 16px 0; }
   table { border-collapse: collapse; margin: 12px 0; }
   td { padding: 4px 12px 4px 0; vertical-align: top; }
@@ -301,11 +377,14 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
   }
   button:hover, .fetchBtn:hover { background: var(--vscode-button-hoverBackground); }
   #openBtn { margin-top: 0; }
+  .environments { display: flex; flex-wrap: wrap; gap: 8px; }
+  .envPill { border: 1px solid; border-radius: 12px; padding: 3px 10px; font-size: 0.9em; }
 </style>
 </head>
 <body>
   <h1>${escapeHtml(path.basename(repoPath))}</h1>
-  <div class="path">${escapeHtml(repoPath)}</div>
+  <div class="path" id="pathRow" title="Open in a new terminal">${escapeHtml(repoPath)}</div>
+  ${remoteRow}
   <div class="description">${escapeHtml(meta.description || "No description available.")}</div>
 
   <h2>Architecture Metadata</h2>
@@ -318,17 +397,22 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     ${metaRow("Last Indexed", lastIndexed)}
   </table>
 
+  ${buildEnvironmentsHtml(meta.environments)}
+
   <h2>Recent Commits</h2>
   <ul>${buildCommitsHtml(data.commits, data.remote)}</ul>
 
   <h2>Remote Branches</h2>
-  <ul>${buildBranchesHtml(data.branches)}</ul>
+  <ul id="branchList">${buildBranchesHtml(data.branches)}</ul>
+  ${paginationControls}
 
   <div class="actions">
     <button id="openBtn">Open in VS Code</button>
     ${browserButton}
     ${pullButton}
-    <button id="updateIndexBtn">Update Index (fill gaps only)</button>
+    <button id="updateIndexBtn">Update Missing Index</button>
+    <button id="generateReadmeBtn">Generate/Update README</button>
+    <button id="generateGitignoreBtn">Generate/Update .gitignore</button>
   </div>
 
   ${readmeSection}
@@ -358,6 +442,51 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     document.getElementById("updateIndexBtn").addEventListener("click", () => {
       vscode.postMessage({ command: "updateIndex" });
     });
+    document.getElementById("generateReadmeBtn").addEventListener("click", () => {
+      vscode.postMessage({ command: "generateReadme" });
+    });
+    document.getElementById("generateGitignoreBtn").addEventListener("click", () => {
+      vscode.postMessage({ command: "generateGitignore" });
+    });
+    document.getElementById("pathRow").addEventListener("click", () => {
+      vscode.postMessage({ command: "openNewTerminal" });
+    });
+    const remoteRow = document.getElementById("remoteRow");
+    if (remoteRow) {
+      remoteRow.addEventListener("click", () => {
+        vscode.postMessage({ command: "openInBrowser" });
+      });
+    }
+    (function () {
+      const items = Array.from(document.querySelectorAll("#branchList li[data-page]"));
+      const prevBtn = document.getElementById("branchPrevBtn");
+      const nextBtn = document.getElementById("branchNextBtn");
+      if (!items.length || !prevBtn || !nextBtn) return;
+      const totalPages = Math.max(...items.map((el) => Number(el.dataset.page))) + 1;
+      const label = document.getElementById("branchPageLabel");
+      let page = 0;
+      function render() {
+        items.forEach((el) => {
+          el.style.display = Number(el.dataset.page) === page ? "" : "none";
+        });
+        if (label) label.textContent = "Page " + (page + 1) + " of " + totalPages;
+        prevBtn.disabled = page === 0;
+        nextBtn.disabled = page >= totalPages - 1;
+      }
+      prevBtn.addEventListener("click", () => {
+        if (page > 0) {
+          page--;
+          render();
+        }
+      });
+      nextBtn.addEventListener("click", () => {
+        if (page < totalPages - 1) {
+          page++;
+          render();
+        }
+      });
+      render();
+    })();
   </script>
 </body>
 </html>`;
@@ -383,6 +512,49 @@ async function refreshPanel(): Promise<void> {
   if (!activePanel) return;
   const data = await collectReportData(displayedRepoPath);
   activePanel.webview.html = buildHtml(displayedRepoPath, displayedMeta, data, getNonce());
+}
+
+/**
+ * Generates (or regenerates) a repo's README/.gitignore via the framework's
+ * `mt-ai-readme`/`mt-ai-gitignore --update --json`, which writes any
+ * regenerated content to a pending file rather than overwriting directly
+ * (see .bash.d/20-vcs/51-git-ai.sh) -- reviewed here with VS Code's native
+ * diff editor before the user chooses to apply or discard it. Shared
+ * between the report panel's own buttons and the command-palette
+ * equivalents in extension.ts.
+ */
+export async function runAiUpdateFlow(repoPath: string, kind: AiUpdateKind): Promise<void> {
+  const { command, label } = AI_UPDATE_KINDS[kind];
+  let result: AiUpdateResult;
+  try {
+    result = await runFrameworkJson<AiUpdateResult>(`cd ${shellQuote(repoPath)} && ${command} --update --json`);
+  } catch (err) {
+    vscode.window.showErrorMessage(`MT DevOps: ${label} generation failed -- ${err instanceof Error ? err.message : String(err)}`);
+    return;
+  }
+
+  if (result.status === "generated" || !result.pending) {
+    vscode.window.showInformationMessage(`MT DevOps: ${label} generated.`);
+    await vscode.window.showTextDocument(vscode.Uri.file(result.target));
+    if (activePanel && repoPath === displayedRepoPath) await refreshPanel();
+    return;
+  }
+
+  await vscode.commands.executeCommand(
+    "vscode.diff",
+    vscode.Uri.file(result.target),
+    vscode.Uri.file(result.pending),
+    `${label}: current ↔ generated`,
+  );
+
+  const choice = await vscode.window.showInformationMessage(`Apply the generated ${label}?`, "Apply", "Discard");
+  if (choice === "Apply") {
+    await runInteractiveShell(`cd ${shellQuote(repoPath)} && ${command} --apply-pending`);
+    vscode.window.showInformationMessage(`MT DevOps: ${label} updated.`);
+  } else if (choice === "Discard") {
+    await runInteractiveShell(`cd ${shellQuote(repoPath)} && ${command} --discard-pending`);
+  }
+  if (activePanel && repoPath === displayedRepoPath) await refreshPanel();
 }
 
 /**
@@ -427,6 +599,18 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
           const remoteUrl = await runGit(displayedRepoPath, ["remote", "get-url", "origin"]);
           const remote = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
           if (remote) vscode.env.openExternal(vscode.Uri.parse(remote.webUrl));
+          return;
+        }
+        if (message.command === "openNewTerminal") {
+          openNewTerminalAt(displayedRepoPath);
+          return;
+        }
+        if (message.command === "generateReadme") {
+          await runAiUpdateFlow(displayedRepoPath, "readme");
+          return;
+        }
+        if (message.command === "generateGitignore") {
+          await runAiUpdateFlow(displayedRepoPath, "gitignore");
           return;
         }
         if (message.command === "pullRepo") {

@@ -26,6 +26,18 @@ export function runInTerminal(command: string): void {
   terminal.sendText(command);
 }
 
+/**
+ * Opens a brand-new terminal window cd'd into a repo, unlike runInTerminal
+ * which always finds-or-reuses the single shared "MT DevOps" terminal --
+ * this is for "open this repo in its own terminal" actions (e.g. clicking a
+ * repo path), where reusing the shared terminal would just replace whatever
+ * repo it was already sitting in.
+ */
+export function openNewTerminalAt(repoPath: string): void {
+  const name = repoPath.split(/[/\\]/).filter(Boolean).pop() ?? repoPath;
+  vscode.window.createTerminal({ name, cwd: repoPath }).show();
+}
+
 const START_MARKER = "@@MT_DEVOPS_OUTPUT_START@@";
 const END_MARKER = "@@MT_DEVOPS_OUTPUT_END@@";
 
