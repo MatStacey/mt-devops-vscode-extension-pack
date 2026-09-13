@@ -246,7 +246,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (!editor.selection.isEmpty || editor.document.isUntitled) {
         const text = editor.selection.isEmpty ? editor.document.getText() : editor.document.getText(editor.selection);
         const ext = path.extname(editor.document.fileName) || ".txt";
-        const tempFile = path.join(os.tmpdir(), `mt-ai-explain-${Date.now()}${ext}`);
+        // mkdtemp (not a Date.now()-named file directly under the shared,
+        // world-writable os.tmpdir()) gives a private, non-guessable,
+        // 0700 directory -- a predictable path there would let another
+        // local user read the code snippet or race to plant a symlink at
+        // that path before this write lands.
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mt-ai-explain-"));
+        const tempFile = path.join(tempDir, `snippet${ext}`);
         fs.writeFileSync(tempFile, text, "utf8");
         runInTerminal(`ai-explain -f ${shellQuote(tempFile)}`);
         return;
