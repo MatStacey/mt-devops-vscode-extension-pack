@@ -49,6 +49,10 @@
         "title": "MT DevOps: Explain Code (AI)"
       },
       {
+        "command": "mtDevops.searchRepos",
+        "title": "MT DevOps: Search Repos"
+      },
+      {
         "command": "mtDevops.refreshJobs",
         "title": "Refresh",
         "icon": "$(refresh)"
@@ -207,6 +211,11 @@
         "command": "mtDevops.exportForLLM",
         "title": "Export for LLM",
         "icon": "$(export)"
+      },
+      {
+        "command": "mtDevops.toggleFavoriteRepo",
+        "title": "Toggle Favorite",
+        "icon": "$(star-full)"
       },
       {
         "command": "mtDevops.indexCategory",
@@ -595,6 +604,11 @@
           "command": "mtDevops.exportForLLM",
           "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
           "group": "3_sync@3"
+        },
+        {
+          "command": "mtDevops.toggleFavoriteRepo",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "1_open@2"
         },
         {
           "command": "mtDevops.indexCategory",

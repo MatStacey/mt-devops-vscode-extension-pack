@@ -26,6 +26,14 @@ interface RemoteInfo {
   webUrl: string;
   /** e.g. "https://github.com/MatStacey/mt-devops-framework/commit/" -- append a hash directly. */
   commitUrlBase: string;
+  /** "owner/repo", only set for a github.com remote -- what `gh`'s own --repo flag expects. Null for every other host (Bitbucket, self-hosted GitLab, ...), since `gh` only ever talks to GitHub. */
+  ghSlug: string | null;
+}
+
+interface GithubStatus {
+  openPrCount: number;
+  ciConclusion: string | null;
+  ciUrl: string | null;
 }
 
 interface BranchInfo {
@@ -43,6 +51,13 @@ interface AiUpdateResult {
   pending: string | null;
 }
 
+interface DependencyAuditResult {
+  status: "ok" | "unsupported" | "tool-missing" | "error";
+  tool: string | null;
+  message: string | null;
+  vulnerabilities: Record<string, number> | null;
+}
+
 const AI_UPDATE_KINDS = {
   readme: { command: "mt-ai-readme", label: "README" },
   gitignore: { command: "mt-ai-gitignore", label: ".gitignore" },
@@ -56,6 +71,29 @@ interface ReportData {
   branches: BranchInfo[];
   behindCount: number;
   readmeHtml: string | null;
+  /** Days the repo's latest commit is newer than the README's last edit, or null if there's no README or no commits to compare against. Only ever positive -- a README edited after the latest commit isn't "stale" by this measure. */
+  readmeStaleDays: number | null;
+  hasDockerCompose: boolean;
+  hasHelmChart: boolean;
+  github: GithubStatus | null;
+}
+
+/** A Compose file at the repo root -- the same thing DockerProvider's "group by repository" keys off of (com.docker.compose.project.working_dir), so this is "does the Docker panel have anything for this repo", not a generic Docker-usage guess. */
+function detectDockerCompose(repoPath: string): boolean {
+  return ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"].some((name) => fs.existsSync(path.join(repoPath, name)));
+}
+
+/** A Helm chart at the repo root or in a conventional charts/helm subfolder -- not exhaustive (a chart could live anywhere), just the common layouts worth a one-click link rather than a real dependency the Helm panel relies on. */
+function detectHelmChart(repoPath: string): boolean {
+  if (fs.existsSync(path.join(repoPath, "Chart.yaml"))) return true;
+  for (const sub of ["helm", "chart", "charts"]) {
+    const dir = path.join(repoPath, sub);
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) continue;
+    if (fs.existsSync(path.join(dir, "Chart.yaml"))) return true;
+    const nested = fs.readdirSync(dir).find((entry) => fs.existsSync(path.join(dir, entry, "Chart.yaml")));
+    if (nested) return true;
+  }
+  return false;
 }
 
 /** Reads the 5 most recent commits via a plain, read-only `git log` -- not framework policy, just a local git query, same as __mt_hub_preview's own bash equivalent. */
@@ -130,7 +168,71 @@ function parseRemoteUrl(remoteUrl: string): RemoteInfo | null {
   repoPath = repoPath.replace(/\.git$/, "").replace(/\/+$/, "");
   const webUrl = `https://${host}/${repoPath}`;
   const commitSegment = host === "bitbucket.org" ? "commits" : "commit";
-  return { webUrl, commitUrlBase: `${webUrl}/${commitSegment}/` };
+  return { webUrl, commitUrlBase: `${webUrl}/${commitSegment}/`, ghSlug: host === "github.com" ? repoPath : null };
+}
+
+/** Memoized per activation -- `gh --version` is a cheap, static fact about this machine, not worth re-checking on every single report render. */
+let ghAvailableCache: Promise<boolean> | undefined;
+function isGhAvailable(): Promise<boolean> {
+  if (!ghAvailableCache) {
+    ghAvailableCache = new Promise((resolve) => {
+      execFile("gh", ["--version"], (error) => resolve(!error));
+    });
+  }
+  return ghAvailableCache;
+}
+
+/**
+ * Open PR count and the default branch's latest CI run, both via `gh`
+ * (already relied on elsewhere in this ecosystem for PR/merge workflows)
+ * rather than a new framework command -- GitHub-only for now, since `gh`
+ * itself only ever talks to GitHub; resolves null on any failure (not
+ * installed, not authenticated, private repo without access, ...) so a
+ * repo report never blocks or errors on this being unavailable.
+ */
+function fetchGithubStatus(slug: string): Promise<GithubStatus | null> {
+  return new Promise((resolve) => {
+    execFile(
+      "gh",
+      ["pr", "list", "--repo", slug, "--state", "open", "--json", "number"],
+      { maxBuffer: 1024 * 1024 },
+      (prError, prStdout) => {
+        if (prError) {
+          resolve(null);
+          return;
+        }
+        let openPrCount = 0;
+        try {
+          openPrCount = (JSON.parse(prStdout) as unknown[]).length;
+        } catch {
+          resolve(null);
+          return;
+        }
+
+        execFile(
+          "gh",
+          ["run", "list", "--repo", slug, "--limit", "1", "--json", "conclusion,status,url"],
+          { maxBuffer: 1024 * 1024 },
+          (runError, runStdout) => {
+            let ciConclusion: string | null = null;
+            let ciUrl: string | null = null;
+            if (!runError) {
+              try {
+                const runs = JSON.parse(runStdout) as Array<{ conclusion: string; status: string; url: string }>;
+                if (runs.length > 0) {
+                  ciConclusion = runs[0].status === "completed" ? runs[0].conclusion : runs[0].status;
+                  ciUrl = runs[0].url;
+                }
+              } catch {
+                // No workflow runs, or gh's output changed shape -- leave CI status null rather than fail the whole report over it.
+              }
+            }
+            resolve({ openPrCount, ciConclusion, ciUrl });
+          },
+        );
+      },
+    );
+  });
 }
 
 /** Local branch names, via `git branch --format`, not the interactive picker used elsewhere. */
@@ -195,6 +297,27 @@ function findReadme(repoPath: string): string | null {
   return readme ? path.join(repoPath, readme) : null;
 }
 
+/**
+ * Days the repo's latest commit is newer than the README's own last
+ * commit, or null if there's no README, no commits at all, or the
+ * README is untracked (never committed, so git has no date for it).
+ * Deliberately uses git's own commit history rather than the README
+ * file's filesystem mtime -- a fresh clone stamps every file's mtime as
+ * the checkout time, not its real last-edit time, which would make an
+ * mtime-based comparison meaningless immediately after cloning.
+ */
+async function readReadmeStaleDays(repoPath: string, readmePath: string | null): Promise<number | null> {
+  if (!readmePath) return null;
+  const [latestRaw, readmeRaw] = await Promise.all([
+    runGit(repoPath, ["log", "-1", "--format=%ct"]),
+    runGit(repoPath, ["log", "-1", "--format=%ct", "--", path.basename(readmePath)]),
+  ]);
+  const latest = Number(latestRaw);
+  const readmeDate = Number(readmeRaw);
+  if (!Number.isFinite(latest) || !readmeRaw || !Number.isFinite(readmeDate)) return null;
+  return Math.max(0, Math.floor((latest - readmeDate) / 86400));
+}
+
 /** Only these URL schemes (plus scheme-relative/relative paths) are allowed in a README's rendered links/images; anything else (e.g. "javascript:") is replaced with "#" rather than passed through. */
 function sanitizeHref(href: string): string {
   if (/^(https?:|mailto:)/i.test(href)) return href;
@@ -248,16 +371,35 @@ async function collectReportData(repoPath: string): Promise<ReportData> {
   const remoteUrl = await runGit(repoPath, ["remote", "get-url", "origin"]);
   const remote = remoteUrl ? parseRemoteUrl(remoteUrl) : null;
 
-  const [commits, localBranches, remoteBranches, behindCount, readmeHtml] = await Promise.all([
+  const readmePath = findReadme(repoPath);
+
+  const [commits, localBranches, remoteBranches, behindCount, readmeHtml, readmeStaleDays] = await Promise.all([
     readRecentCommits(repoPath),
     readLocalBranches(repoPath),
     readRemoteBranches(repoPath),
     readBehindCount(repoPath),
     renderReadme(repoPath),
+    readReadmeStaleDays(repoPath, readmePath),
   ]);
 
   const branches = remoteBranches.map((b) => ({ ...b, hasLocal: localBranches.has(b.name) }));
-  return { commits, remote, branches, behindCount, readmeHtml };
+
+  let github: GithubStatus | null = null;
+  if (remote?.ghSlug && (await isGhAvailable())) {
+    github = await fetchGithubStatus(remote.ghSlug);
+  }
+
+  return {
+    commits,
+    remote,
+    branches,
+    behindCount,
+    readmeHtml,
+    readmeStaleDays,
+    hasDockerCompose: detectDockerCompose(repoPath),
+    hasHelmChart: detectHelmChart(repoPath),
+    github,
+  };
 }
 
 function escapeHtml(value: string): string {
@@ -285,6 +427,36 @@ function buildEnvironmentsHtml(environments: RepoMeta["environments"]): string {
     })
     .join("");
   return `<h2>Environments</h2><div class="environments">${pills}</div>`;
+}
+
+const CI_ICON: Record<string, string> = { success: "✅", failure: "❌", cancelled: "⏹️", in_progress: "⏳", queued: "⏳" };
+
+function buildGithubHtml(github: GithubStatus | null, webUrl: string | undefined): string {
+  if (!github || !webUrl) return "";
+  const prLine = `<a href="${escapeHtml(webUrl)}/pulls">${github.openPrCount} open PR${github.openPrCount === 1 ? "" : "s"}</a>`;
+  let ciLine = "";
+  if (github.ciConclusion) {
+    const icon = CI_ICON[github.ciConclusion] ?? "❔";
+    const text = `${icon} CI: ${escapeHtml(github.ciConclusion)}`;
+    ciLine = ` · ${github.ciUrl ? `<a href="${escapeHtml(github.ciUrl)}">${text}</a>` : text}`;
+  }
+  return `<h2>GitHub</h2><div>${prLine}${ciLine}</div>`;
+}
+
+/** Renders mt-audit-deps --json's result for injection into #depsResult -- every interpolated value is either a fixed literal or passed through escapeHtml first. */
+function buildDependencyAuditHtml(result: DependencyAuditResult): string {
+  if (result.status === "ok" && result.vulnerabilities) {
+    const total = result.vulnerabilities.total ?? 0;
+    if (total === 0) {
+      return `<div class="staleWarning" style="background:transparent;border-color:var(--vscode-panel-border);">✅ ${escapeHtml(result.tool ?? "")}: no known vulnerabilities.</div>`;
+    }
+    const counts = Object.entries(result.vulnerabilities)
+      .filter(([key, value]) => key !== "total" && typeof value === "number" && value > 0)
+      .map(([key, value]) => `${escapeHtml(key)}: ${value}`)
+      .join(", ");
+    return `<div class="staleWarning">⚠️ ${escapeHtml(result.tool ?? "")}: ${total} vulnerabilit${total === 1 ? "y" : "ies"}${counts ? ` (${counts})` : ""}.</div>`;
+  }
+  return `<div class="staleWarning">ℹ️ ${escapeHtml(result.message ?? "Dependency audit unavailable.")}</div>`;
 }
 
 function buildCommitsHtml(commits: CommitEntry[], remote: RemoteInfo | null): string {
@@ -327,8 +499,14 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
       ? `<button id="pullBtn">Update (Pull ${data.behindCount} commit${data.behindCount === 1 ? "" : "s"})</button>`
       : "";
 
+  const README_STALE_THRESHOLD_DAYS = 30;
+  const readmeStaleWarning =
+    data.readmeStaleDays !== null && data.readmeStaleDays > README_STALE_THRESHOLD_DAYS
+      ? `<div class="staleWarning">⚠️ README hasn't been touched in ${data.readmeStaleDays} days, though the codebase has moved on since -- consider Generate/Update README below.</div>`
+      : "";
+
   const readmeSection = data.readmeHtml
-    ? `<h2>README</h2><div class="readme">${data.readmeHtml}</div>`
+    ? `<h2>README</h2>${readmeStaleWarning}<div class="readme">${data.readmeHtml}</div>`
     : "";
 
   const remoteRow = data.remote
@@ -379,6 +557,7 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
   #openBtn { margin-top: 0; }
   .environments { display: flex; flex-wrap: wrap; gap: 8px; }
   .envPill { border: 1px solid; border-radius: 12px; padding: 3px 10px; font-size: 0.9em; }
+  .staleWarning { background: var(--vscode-inputValidation-warningBackground); border: 1px solid var(--vscode-inputValidation-warningBorder); padding: 8px 12px; border-radius: 3px; margin-bottom: 10px; font-size: 0.9em; }
 </style>
 </head>
 <body>
@@ -399,6 +578,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
 
   ${buildEnvironmentsHtml(meta.environments)}
 
+  ${buildGithubHtml(data.github, data.remote?.webUrl)}
+
   <h2>Recent Commits</h2>
   <ul>${buildCommitsHtml(data.commits, data.remote)}</ul>
 
@@ -413,7 +594,12 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     <button id="updateIndexBtn">Update Missing Index</button>
     <button id="generateReadmeBtn">Generate/Update README</button>
     <button id="generateGitignoreBtn">Generate/Update .gitignore</button>
+    <button id="checkDepsBtn">Check Dependencies</button>
+    ${data.hasDockerCompose ? `<button id="viewDockerBtn">View in Docker Panel</button>` : ""}
+    ${data.hasHelmChart ? `<button id="viewHelmBtn">View in Helm Panel</button>` : ""}
   </div>
+
+  <div id="depsResult"></div>
 
   ${readmeSection}
 
@@ -448,6 +634,22 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     document.getElementById("generateGitignoreBtn").addEventListener("click", () => {
       vscode.postMessage({ command: "generateGitignore" });
     });
+    const checkDepsBtn = document.getElementById("checkDepsBtn");
+    checkDepsBtn.addEventListener("click", () => {
+      checkDepsBtn.disabled = true;
+      checkDepsBtn.textContent = "Checking...";
+      vscode.postMessage({ command: "checkDependencies" });
+    });
+    window.addEventListener("message", (event) => {
+      if (event.data.command !== "dependencyAuditResult") return;
+      checkDepsBtn.disabled = false;
+      checkDepsBtn.textContent = "Check Dependencies";
+      // Safe: event.data.html is built extension-side by
+      // buildDependencyAuditHtml, which escapeHtml()s every value it
+      // interpolates -- same trust boundary as the rest of this file's
+      // server-rendered HTML strings (buildGithubHtml, metaRow, ...).
+      document.getElementById("depsResult").innerHTML = event.data.html;
+    });
     document.getElementById("pathRow").addEventListener("click", () => {
       vscode.postMessage({ command: "openNewTerminal" });
     });
@@ -455,6 +657,18 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     if (remoteRow) {
       remoteRow.addEventListener("click", () => {
         vscode.postMessage({ command: "openInBrowser" });
+      });
+    }
+    const viewDockerBtn = document.getElementById("viewDockerBtn");
+    if (viewDockerBtn) {
+      viewDockerBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "viewInDocker" });
+      });
+    }
+    const viewHelmBtn = document.getElementById("viewHelmBtn");
+    if (viewHelmBtn) {
+      viewHelmBtn.addEventListener("click", () => {
+        vscode.postMessage({ command: "viewInHelm" });
       });
     }
     (function () {
@@ -611,6 +825,31 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
         }
         if (message.command === "generateGitignore") {
           await runAiUpdateFlow(displayedRepoPath, "gitignore");
+          return;
+        }
+        if (message.command === "checkDependencies") {
+          // Deliberately on-demand only, per plan -- a real audit hits a
+          // registry/database and can take several seconds, too slow to
+          // run automatically as part of collectReportData on every open.
+          let result: DependencyAuditResult;
+          try {
+            result = await runFrameworkJson<DependencyAuditResult>(`cd ${shellQuote(displayedRepoPath)} && mt-audit-deps --json`);
+          } catch (err) {
+            result = { status: "error", tool: null, message: err instanceof Error ? err.message : String(err), vulnerabilities: null };
+          }
+          activePanel?.webview.postMessage({ command: "dependencyAuditResult", html: buildDependencyAuditHtml(result) });
+          return;
+        }
+        // Each view contribution gets a VS Code-generated "<viewId>.focus"
+        // command automatically -- just navigation, not a repo-filtered
+        // view (the Docker/Helm panels don't take a repo argument), so
+        // there's nothing more to pass through here.
+        if (message.command === "viewInDocker") {
+          await vscode.commands.executeCommand("mtDevopsDocker.focus");
+          return;
+        }
+        if (message.command === "viewInHelm") {
+          await vscode.commands.executeCommand("mtDevopsHelm.focus");
           return;
         }
         if (message.command === "pullRepo") {
