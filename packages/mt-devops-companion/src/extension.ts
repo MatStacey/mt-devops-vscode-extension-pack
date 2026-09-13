@@ -5,6 +5,8 @@ import * as vscode from "vscode";
 import { registerAiChatParticipant } from "./aiChatParticipant";
 import { DoctorProvider } from "./doctorProvider";
 import { DockerContainerItem, DockerProvider } from "./dockerProvider";
+import { ExportWizardProvider, WizardFileItem } from "./exportWizardProvider";
+import { showExportPlan } from "./exportPlanPanel";
 import { resolveFrameworkPaths, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { HelmProvider, HelmReleaseItem } from "./helmProvider";
@@ -12,8 +14,16 @@ import { HistoryEntryItem, HistoryProvider } from "./historyProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
 import { LogProvider } from "./logProvider";
 import { MinikubeProvider } from "./minikubeProvider";
-import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem, WorkspaceCategoryItem } from "./repoHubProvider";
-import { runAiUpdateFlow, showRepoReport } from "./repoReportPanel";
+import {
+  BackgroundIndexingControlItem,
+  getIndexModifierFlags,
+  RepoCategoryItem,
+  RepoHubProvider,
+  RepoMeta,
+  RepoTreeItem,
+  WorkspaceCategoryItem,
+} from "./repoHubProvider";
+import { initRepoReportPanel, runAiUpdateFlow, showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
 import { readConfigValue, SettingsValueItem, SettingsProvider } from "./settingsProvider";
 import { StatusProvider } from "./statusProvider";
@@ -205,12 +215,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("mtDevops.indexRepoFromExplorer", (uri: vscode.Uri | undefined) => {
       const repoPath = resolveRepoRootTarget(uri);
       if (!repoPath) return;
-      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(repoPath))}`);
+      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(repoPath))}${getIndexModifierFlags(context.globalState)}`);
     }),
     vscode.commands.registerCommand("mtDevops.updateRepoIndexFromExplorer", (uri: vscode.Uri | undefined) => {
       const repoPath = resolveRepoRootTarget(uri);
       if (!repoPath) return;
-      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}`);
+      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}${getIndexModifierFlags(context.globalState)}`);
     }),
 
     // Command-palette/Explorer counterparts to the Repo Report panel's own
@@ -396,16 +406,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.repoPath), { forceNewWindow: true }),
     ),
     vscode.commands.registerCommand("mtDevops.indexRepo", (item: RepoTreeItem) =>
-      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(item.repoPath))}`),
+      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(item.repoPath))}${getIndexModifierFlags(context.globalState)}`),
     ),
     vscode.commands.registerCommand("mtDevops.updateRepo", (item: RepoTreeItem) =>
-      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(item.repoPath))}`),
+      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(item.repoPath))}${getIndexModifierFlags(context.globalState)}`),
     ),
     vscode.commands.registerCommand("mtDevops.indexCategory", (item: RepoCategoryItem) =>
-      runInTerminal(`mt-hub --index -f -t ${shellQuote(item.category)}`),
+      runInTerminal(`mt-hub --index -f -t ${shellQuote(item.category)}${getIndexModifierFlags(context.globalState)}`),
     ),
     vscode.commands.registerCommand("mtDevops.updateCategory", (item: RepoCategoryItem) =>
-      runInTerminal(`mt-hub --index -u -t ${shellQuote(item.category)}`),
+      runInTerminal(`mt-hub --index -u -t ${shellQuote(item.category)}${getIndexModifierFlags(context.globalState)}`),
     ),
     vscode.commands.registerCommand("mtDevops.indexAllRepos", async () => {
       const choice = await vscode.window.showWarningMessage(
@@ -413,9 +423,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         { modal: true },
         "Index All",
       );
-      if (choice === "Index All") runInTerminal("mt-hub --index -f");
+      if (choice === "Index All") runInTerminal(`mt-hub --index -f${getIndexModifierFlags(context.globalState)}`);
     }),
-    vscode.commands.registerCommand("mtDevops.updateAllRepos", () => runInTerminal("mt-hub --index -u")),
+    vscode.commands.registerCommand("mtDevops.updateAllRepos", () =>
+      runInTerminal(`mt-hub --index -u${getIndexModifierFlags(context.globalState)}`),
+    ),
     // The "Open in VS Code" section is a curated set of repo names, not
     // a real mt-hub -t/--type folder, so there's no single filter that
     // covers it the way indexCategory/updateCategory's -t does -- chain
@@ -424,14 +436,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // precedent (only the whole-VCS_ROOT indexAllRepos warns first,
     // since this is bounded to whatever's actually open right now).
     vscode.commands.registerCommand("mtDevops.indexWorkspaceRepos", (item: WorkspaceCategoryItem) => {
+      const flags = getIndexModifierFlags(context.globalState);
       const command = item.repos
-        .map(([repoPath]) => `mt-hub --index -f -r ${shellQuote(path.basename(repoPath))}`)
+        .map(([repoPath]) => `mt-hub --index -f -r ${shellQuote(path.basename(repoPath))}${flags}`)
         .join(" && ");
       runInTerminal(command);
     }),
     vscode.commands.registerCommand("mtDevops.updateWorkspaceRepos", (item: WorkspaceCategoryItem) => {
+      const flags = getIndexModifierFlags(context.globalState);
       const command = item.repos
-        .map(([repoPath]) => `mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}`)
+        .map(([repoPath]) => `mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}${flags}`)
         .join(" && ");
       runInTerminal(command);
     }),
@@ -511,6 +525,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         category?: string;
         description?: string;
         stack?: string;
+        gcp?: RepoMeta["gcp"];
       }
       let results: SearchResult[];
       try {
@@ -530,7 +545,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           description: r.category,
           detail: r.description,
           repoPath: r.path,
-          meta: { category: r.category, description: r.description, stack: r.stack } as RepoMeta,
+          meta: { category: r.category, description: r.description, stack: r.stack, gcp: r.gcp } as RepoMeta,
         })),
         { placeHolder: `${results.length} match${results.length === 1 ? "" : "es"} for "${term}"` },
       );
@@ -596,12 +611,29 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       "mtDevops.refreshJobs",
     );
     const repoHubProvider = new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json"), vcsRoot, context.globalState);
-    registerWatchedView(
-      context,
-      "mtDevopsRepoHub",
-      path.join(cacheDir, ".vcs_hub.json"),
-      repoHubProvider,
-      "mtDevops.refreshRepoHub",
+    initRepoReportPanel(context.globalState);
+    // Registered manually (not via registerWatchedView) because the
+    // Background Indexing checkbox row needs TreeView.onDidChangeCheckboxState,
+    // an event that lives on the view object itself, not the data provider
+    // -- same reasoning as the Export Wizard's own file-exclude checkboxes.
+    const repoHubView = vscode.window.createTreeView("mtDevopsRepoHub", { treeDataProvider: repoHubProvider });
+    context.subscriptions.push(repoHubView);
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.refreshRepoHub", () => repoHubProvider.refresh()),
+    );
+    const repoHubWatcher = vscode.workspace.createFileSystemWatcher(path.join(cacheDir, ".vcs_hub.json"));
+    repoHubWatcher.onDidChange(() => repoHubProvider.refresh());
+    repoHubWatcher.onDidCreate(() => repoHubProvider.refresh());
+    repoHubWatcher.onDidDelete(() => repoHubProvider.refresh());
+    context.subscriptions.push(repoHubWatcher);
+    context.subscriptions.push(
+      repoHubView.onDidChangeCheckboxState((e) => {
+        for (const [item, state] of e.items) {
+          if (item instanceof BackgroundIndexingControlItem) {
+            void repoHubProvider.setBackgroundIndexing(state === vscode.TreeItemCheckboxState.Checked);
+          }
+        }
+      }),
     );
     // The tree's "Open in VS Code" section reads vscode.workspace.workspaceFolders
     // directly (no file to watch), so it needs its own refresh trigger for
@@ -616,6 +648,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Favorites section membership), not a distinct item kind.
     context.subscriptions.push(
       vscode.commands.registerCommand("mtDevops.toggleFavoriteRepo", (item: RepoTreeItem) => repoHubProvider.toggleFavorite(item.repoPath)),
+    );
+    // AI Provider Override row: a quick pick over the framework's own
+    // fixed provider vocabulary (ai.default_provider's own valid values,
+    // per mt-hub's -p/--provider validation) plus a blank "Default" entry
+    // meaning no override.
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.hubChangeProviderOverride", async () => {
+        const options = [
+          { label: "Default (config.yaml)", value: "" },
+          { label: "gemini", value: "gemini" },
+          { label: "claude", value: "claude" },
+          { label: "claude-code", value: "claude-code" },
+          { label: "local", value: "local" },
+        ];
+        const picked = await vscode.window.showQuickPick(options, { placeHolder: "Select an AI provider override for indexing" });
+        if (picked) await repoHubProvider.setProviderOverride(picked.value);
+      }),
     );
 
     const configPath = path.join(configDir, "config.yaml");
@@ -647,6 +696,83 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           return;
         }
         await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(resolved));
+      }),
+    );
+
+    // Export Wizard: a GUI front end for mt-export's own -s/-e/-x/-z
+    // flags. Uses vscode.window.createTreeView directly (not
+    // registerWatchedView/registerAsyncView) because checkbox toggles
+    // are delivered via TreeView.onDidChangeCheckboxState, an event that
+    // lives on the view object itself, not the data provider.
+    const exportWizardProvider = new ExportWizardProvider(configPath);
+    const exportWizardView = vscode.window.createTreeView("mtDevopsExportWizard", {
+      treeDataProvider: exportWizardProvider,
+      showCollapseAll: true,
+    });
+    context.subscriptions.push(exportWizardView);
+    context.subscriptions.push(
+      exportWizardView.onDidChangeCheckboxState((e) => {
+        for (const [item, state] of e.items) {
+          if (item instanceof WizardFileItem) {
+            exportWizardProvider.setExcluded(item.relPath, state === vscode.TreeItemCheckboxState.Checked);
+          }
+        }
+      }),
+    );
+
+    async function openExportWizardFor(repoPath: string): Promise<void> {
+      exportWizardProvider.setRepo(repoPath);
+      await vscode.commands.executeCommand("mtDevopsExportWizard.focus");
+    }
+
+    context.subscriptions.push(
+      // Repo Hub context-menu entry point: the item already carries its
+      // own repoPath, no resolution needed.
+      vscode.commands.registerCommand("mtDevops.openExportWizard", (item: RepoTreeItem) => openExportWizardFor(item.repoPath)),
+      // Command-palette/Explorer entry point: same repo-resolution
+      // fallback (context uri, else the one open repo, else a quick
+      // pick) as every other command that can be invoked bare.
+      vscode.commands.registerCommand("mtDevops.openExportWizardFromExplorer", async (uri: vscode.Uri | undefined) => {
+        const repoPath = await pickRepoPath(uri);
+        if (repoPath) await openExportWizardFor(repoPath);
+      }),
+      vscode.commands.registerCommand("mtDevops.wizardChangeSchema", async () => {
+        const schemasDir = path.join(os.homedir(), ".bash.d", "config", "export", "schemas");
+        let schemas = ["default", "terraform", "shell", "python", "springboot", "cloudrun"];
+        try {
+          schemas = fs
+            .readdirSync(schemasDir)
+            .filter((f) => f.endsWith(".yaml"))
+            .map((f) => f.replace(/\.yaml$/, ""))
+            .sort();
+        } catch {
+          // Fall back to the hardcoded list above -- an unreadable
+          // schemas dir shouldn't block picking a schema by name.
+        }
+        const picked = await vscode.window.showQuickPick(schemas, { placeHolder: "Select an export schema" });
+        if (picked) exportWizardProvider.setSchema(picked);
+      }),
+      vscode.commands.registerCommand("mtDevops.wizardEditExtExclude", async () => {
+        const value = await vscode.window.showInputBox({
+          prompt: "File extensions to exclude, comma-separated (e.g. log,tmp,map)",
+          value: exportWizardProvider.getExcludeExt(),
+        });
+        if (value !== undefined) exportWizardProvider.setExcludeExt(value);
+      }),
+      vscode.commands.registerCommand("mtDevops.wizardToggleFormat", () => exportWizardProvider.toggleZip()),
+      vscode.commands.registerCommand("mtDevops.showExportPlan", async () => {
+        const repoPath = exportWizardProvider.getRepoPath();
+        if (!repoPath) {
+          vscode.window.showWarningMessage("MT DevOps: open the Export Wizard on a repo first.");
+          return;
+        }
+        await showExportPlan(
+          repoPath,
+          exportWizardProvider.getSchema(),
+          exportWizardProvider.getExcludeExt(),
+          exportWizardProvider.getZip(),
+          exportWizardProvider.getExcludedPaths(),
+        );
       }),
     );
 

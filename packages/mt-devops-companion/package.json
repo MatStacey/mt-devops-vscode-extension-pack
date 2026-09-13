@@ -218,6 +218,10 @@
         "icon": "$(star-full)"
       },
       {
+        "command": "mtDevops.hubChangeProviderOverride",
+        "title": "Change AI Provider Override"
+      },
+      {
         "command": "mtDevops.indexCategory",
         "title": "Index All in Category",
         "icon": "$(sync)"
@@ -272,6 +276,32 @@
         "icon": "$(export)"
       },
       {
+        "command": "mtDevops.openExportWizard",
+        "title": "Export Wizard (GUI)",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "mtDevops.openExportWizardFromExplorer",
+        "title": "MT DevOps: Open Export Wizard"
+      },
+      {
+        "command": "mtDevops.wizardChangeSchema",
+        "title": "Change Export Schema"
+      },
+      {
+        "command": "mtDevops.wizardEditExtExclude",
+        "title": "Edit Extension Exclusions"
+      },
+      {
+        "command": "mtDevops.wizardToggleFormat",
+        "title": "Toggle Output Format (TXT/ZIP)"
+      },
+      {
+        "command": "mtDevops.showExportPlan",
+        "title": "Show Export Plan",
+        "icon": "$(play)"
+      },
+      {
         "command": "mtDevops.viewExports",
         "title": "View Exports",
         "icon": "$(folder-opened)"
@@ -309,6 +339,12 @@
         "icon": "$(debug-rerun)"
       }
     ],
+    "viewsWelcome": [
+      {
+        "view": "mtDevopsExportWizard",
+        "contents": "Right-click a repo in Repo Hub and choose \"Export Wizard (GUI)\", or run the command below on the current folder.\n[Open Export Wizard](command:mtDevops.openExportWizardFromExplorer)"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -327,6 +363,10 @@
         {
           "id": "mtDevopsRepoHub",
           "name": "Repo Hub"
+        },
+        {
+          "id": "mtDevopsExportWizard",
+          "name": "Export Wizard"
         },
         {
           "id": "mtDevopsSecrets",
@@ -427,6 +467,11 @@
         },
         {
           "command": "mtDevops.generateGitignore",
+          "when": "explorerResourceIsFolder",
+          "group": "7_modification"
+        },
+        {
+          "command": "mtDevops.openExportWizardFromExplorer",
           "when": "explorerResourceIsFolder",
           "group": "7_modification"
         },
@@ -549,6 +594,11 @@
           "group": "navigation"
         },
         {
+          "command": "mtDevops.showExportPlan",
+          "when": "view == mtDevopsExportWizard",
+          "group": "navigation"
+        },
+        {
           "command": "mtDevops.refreshHistory",
           "when": "view == mtDevopsHistory",
           "group": "navigation"
@@ -624,6 +674,11 @@
           "command": "mtDevops.exportForLLM",
           "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
           "group": "3_sync@3"
+        },
+        {
+          "command": "mtDevops.openExportWizard",
+          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "group": "3_sync@4"
         },
         {
           "command": "mtDevops.toggleFavoriteRepo",

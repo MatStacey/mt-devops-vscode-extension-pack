@@ -8,6 +8,13 @@ export interface RepoEnvironment {
   type: string;
 }
 
+/** From __mt_hub_detect_gcp (.bash.d/20-vcs/53-vcs-insight.sh) -- "source" is "terraform" when a "google"/"google-beta" provider block or any google_* resource type was found (also the only source that ever populates "services", since resource-type prefixes are what map to a human-readable product name), "config-files" for the weaker app.yaml/cloudbuild.yaml/registry-reference fallback, "none" otherwise. */
+export interface RepoGcp {
+  detected: boolean;
+  source: "terraform" | "config-files" | "none";
+  services: string[];
+}
+
 export interface RepoMeta {
   category?: string;
   description?: string;
@@ -16,6 +23,7 @@ export interface RepoMeta {
   cicd?: string;
   testing?: string;
   environments?: RepoEnvironment[];
+  gcp?: RepoGcp;
   last_indexed?: number;
 }
 
@@ -126,6 +134,45 @@ export class FavoritesCategoryItem extends vscode.TreeItem {
   }
 }
 
+/**
+ * A real tree checkbox controlling whether every mt-hub --index call this
+ * provider's commands build runs with -b/--background -- ticked, indexing
+ * detaches into a background job (tracked in the Jobs panel) instead of
+ * streaming in the shared terminal, useful for a bulk "Index All Repos"
+ * run the user doesn't want to sit and watch. Checkbox state changes are
+ * delivered via the Repo Hub TreeView's own onDidChangeCheckboxState
+ * event (registered in extension.ts, since that event lives on the
+ * TreeView object, not this provider) -- the same wiring pattern the
+ * Export Wizard's file-exclude checkboxes use.
+ */
+export class BackgroundIndexingControlItem extends vscode.TreeItem {
+  constructor(enabled: boolean) {
+    super("Background Indexing", vscode.TreeItemCollapsibleState.None);
+    this.checkboxState = enabled ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
+    this.description = enabled ? "On -- runs as a background job" : "Off -- runs visibly in the terminal";
+    this.iconPath = new vscode.ThemeIcon("run-all");
+    this.contextValue = "mtDevopsHubBackgroundToggle";
+  }
+}
+
+/**
+ * Click-to-quick-pick row overriding mt-hub --index's AI provider for
+ * this session, the GUI equivalent of the CLI's own -p/--provider flag
+ * (e.g. to save Claude usage by indexing with Gemini instead, without
+ * touching the real ai.default_provider in config.yaml). Empty means no
+ * override -- every index/update call falls back to whatever the config
+ * default already is.
+ */
+export class ProviderOverrideControlItem extends vscode.TreeItem {
+  constructor(provider: string) {
+    super("AI Provider Override", vscode.TreeItemCollapsibleState.None);
+    this.description = provider || "Default (config.yaml)";
+    this.iconPath = new vscode.ThemeIcon("sparkle");
+    this.contextValue = "mtDevopsHubProviderOverride";
+    this.command = { command: "mtDevops.hubChangeProviderOverride", title: "Change AI Provider Override" };
+  }
+}
+
 class RepoErrorItem extends vscode.TreeItem {
   constructor(message: string) {
     super(message, vscode.TreeItemCollapsibleState.None);
@@ -221,6 +268,29 @@ function findOpenWorkspaceRepos(cacheEntries: Array<[string, RepoMeta]>): Array<
 }
 
 const FAVORITES_STATE_KEY = "mtDevops.favoriteRepoPaths";
+const BACKGROUND_INDEXING_STATE_KEY = "mtDevops.backgroundIndexing";
+const PROVIDER_OVERRIDE_STATE_KEY = "mtDevops.providerOverride";
+
+/**
+ * Builds the extra mt-hub --index flags implied by the sidebar's
+ * Background Indexing checkbox / AI Provider Override row -- appended
+ * verbatim to every index/update command built anywhere in extension.ts
+ * (context menus, title-bar buttons, and the Explorer counterparts, some
+ * of which are registered before RepoHubProvider itself exists). Reads
+ * the same globalState keys RepoHubProvider's own instance methods use,
+ * so it's a free function rather than a provider method -- a shared
+ * store, not state owned by one object. Provider values only ever come
+ * from the fixed quick-pick list in extension.ts (gemini/claude/
+ * claude-code/local), never free-typed input, so no shell-quoting is
+ * needed here.
+ */
+export function getIndexModifierFlags(state: vscode.Memento): string {
+  const parts: string[] = [];
+  if (state.get(BACKGROUND_INDEXING_STATE_KEY, false)) parts.push("-b");
+  const provider = state.get(PROVIDER_OVERRIDE_STATE_KEY, "");
+  if (provider) parts.push("-p", provider);
+  return parts.length > 0 ? ` ${parts.join(" ")}` : "";
+}
 
 export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
@@ -244,6 +314,24 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
     const favorites = this.getFavoritePaths();
     const next = favorites.includes(repoPath) ? favorites.filter((p) => p !== repoPath) : [...favorites, repoPath];
     await this.state.update(FAVORITES_STATE_KEY, next);
+    this.refresh();
+  }
+
+  getBackgroundIndexing(): boolean {
+    return this.state.get(BACKGROUND_INDEXING_STATE_KEY, false);
+  }
+
+  async setBackgroundIndexing(value: boolean): Promise<void> {
+    await this.state.update(BACKGROUND_INDEXING_STATE_KEY, value);
+    this.refresh();
+  }
+
+  getProviderOverride(): string {
+    return this.state.get(PROVIDER_OVERRIDE_STATE_KEY, "");
+  }
+
+  async setProviderOverride(value: string): Promise<void> {
+    await this.state.update(PROVIDER_OVERRIDE_STATE_KEY, value);
     this.refresh();
   }
 
@@ -284,8 +372,17 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
       const openDirtyFlags = await Promise.all(openRepos.map(([repoPath]) => isDirty(repoPath)));
       const dirtyCount = openDirtyFlags.filter(Boolean).length;
       const summary = new SummaryItem(cacheEntries.length, needsIndex, dirtyCount);
+      const backgroundItem = new BackgroundIndexingControlItem(this.getBackgroundIndexing());
+      const providerItem = new ProviderOverrideControlItem(this.getProviderOverride());
 
-      return [summary, ...favoritesSection, ...workspaceSection, ...groupByCategory(cacheEntries, this.vcsRoot)];
+      return [
+        backgroundItem,
+        providerItem,
+        summary,
+        ...favoritesSection,
+        ...workspaceSection,
+        ...groupByCategory(cacheEntries, this.vcsRoot),
+      ];
     } catch (err) {
       return [new RepoErrorItem(err instanceof Error ? err.message : String(err))];
     }

@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
 import { openNewTerminalAt, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote } from "./framework";
+import { getIndexModifierFlags } from "./repoHubProvider";
 import type { RepoMeta } from "./repoHubProvider";
 
 /** Same badge-style palette as other status-coded pills elsewhere in this webview, keyed by mt-hub's AI-inferred environment "type" vocabulary. */
@@ -429,6 +430,17 @@ function buildEnvironmentsHtml(environments: RepoMeta["environments"]): string {
   return `<h2>Environments</h2><div class="environments">${pills}</div>`;
 }
 
+/** Renders __mt_hub_detect_gcp's result -- omitted entirely when nothing was detected, same as buildEnvironmentsHtml, rather than a "No GCP usage" line every non-GCP repo would otherwise show. "source" is surfaced only as a tooltip, not inline text, since "detected via Terraform" vs "detected via config files" matters far less than the fact/services themselves. */
+function buildGcpHtml(gcp: RepoMeta["gcp"]): string {
+  if (!gcp || !gcp.detected) return "";
+  const sourceLabel = gcp.source === "terraform" ? "Detected via Terraform" : "Detected via config files (app.yaml/cloudbuild.yaml/registry references)";
+  const pills =
+    gcp.services.length > 0
+      ? gcp.services.map((s) => `<span class="envPill" style="border-color: var(--vscode-charts-blue);">${escapeHtml(s)}</span>`).join("")
+      : `<span class="envPill" style="border-color: var(--vscode-charts-blue);">GCP</span>`;
+  return `<h2>Google Cloud Platform</h2><div class="environments" title="${escapeHtml(sourceLabel)}">${pills}</div>`;
+}
+
 const CI_ICON: Record<string, string> = { success: "✅", failure: "❌", cancelled: "⏹️", in_progress: "⏳", queued: "⏳" };
 
 function buildGithubHtml(github: GithubStatus | null, webUrl: string | undefined): string {
@@ -578,6 +590,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
 
   ${buildEnvironmentsHtml(meta.environments)}
 
+  ${buildGcpHtml(meta.gcp)}
+
   ${buildGithubHtml(data.github, data.remote?.webUrl)}
 
   <h2>Recent Commits</h2>
@@ -721,6 +735,17 @@ let activePanel: vscode.WebviewPanel | undefined;
 // button after viewing 3 repos would act on all 3.
 let displayedRepoPath = "";
 let displayedMeta: RepoMeta = {};
+// Set once from extension.ts (same context.globalState the Repo Hub tree's
+// Background Indexing checkbox / AI Provider Override row write to) so the
+// report panel's own "Update Missing Index" button honors the same
+// sidebar-configured flags as every other mt-hub --index call site,
+// without needing showRepoReport's own signature (and all its call sites)
+// to thread a Memento through just for this one button.
+let extensionState: vscode.Memento | undefined;
+
+export function initRepoReportPanel(state: vscode.Memento): void {
+  extensionState = state;
+}
 
 async function refreshPanel(): Promise<void> {
   if (!activePanel) return;
@@ -806,7 +831,9 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
           // refresh itself once mt-hub rewrites it -- same reasoning as
           // the equivalent right-click actions, so this runs visibly in
           // the terminal rather than captured.
-          runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(displayedRepoPath))}`);
+          runInTerminal(
+            `mt-hub --index -u -r ${shellQuote(path.basename(displayedRepoPath))}${extensionState ? getIndexModifierFlags(extensionState) : ""}`,
+          );
           return;
         }
         if (message.command === "openInBrowser") {
