@@ -28,6 +28,48 @@ function isConfigValue(node: ConfigNode): node is ConfigValue {
   return typeof node !== "object" || node === null;
 }
 
+/** Walks a dot-path (e.g. "paths.export_dir") down a parsed config.yaml tree, or returns undefined if any segment is missing or the path resolves to a section rather than a leaf value. */
+function resolveDotPath(config: Record<string, ConfigNode>, dotPath: string): ConfigValue | undefined {
+  let node: ConfigNode = config;
+  for (const segment of dotPath.split(".")) {
+    if (typeof node !== "object" || node === null || !(segment in node)) return undefined;
+    node = (node as Record<string, ConfigNode>)[segment];
+  }
+  return isConfigValue(node) ? node : undefined;
+}
+
+/**
+ * Reads a single config.yaml value by dot-path without building the whole
+ * tree view -- used by extension.ts's "View Exports" command, which needs
+ * the real EXPORT_DIR (paths.export_dir) and shouldn't have to shell out
+ * just to resolve one path.
+ */
+export function readConfigValue(configPath: string, dotPath: string): ConfigValue | undefined {
+  return resolveDotPath(readConfig(configPath), dotPath);
+}
+
+/**
+ * The three fixed top-level roots of the Settings tree: "Framework" is the
+ * full config.yaml tree exactly as before (every section, alphabetized),
+ * while "MT Hub" and "MT Export" are curated shortcuts pointing at the
+ * subset of that same config.yaml that backs `mt-hub`/`mt-export`'s own
+ * CLI defaults -- editing a curated entry writes to the identical dotPath
+ * as its Framework-tree counterpart (same mtDevops.editConfigValue command,
+ * same config_manager.py write path), so there's exactly one source of
+ * truth, just two ways to find a setting.
+ */
+export class SettingsGroupItem extends vscode.TreeItem {
+  constructor(
+    label: string,
+    public readonly groupKind: "framework" | "hub" | "export",
+    icon: string,
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    this.iconPath = new vscode.ThemeIcon(icon);
+    this.contextValue = "mtDevopsSettingsGroup";
+  }
+}
+
 export class SettingsSectionItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
@@ -61,7 +103,7 @@ export class SettingsValueItem extends vscode.TreeItem {
   }
 }
 
-export type SettingsTreeItem = SettingsSectionItem | SettingsValueItem;
+export type SettingsTreeItem = SettingsGroupItem | SettingsSectionItem | SettingsValueItem;
 
 function buildChildren(node: Record<string, ConfigNode>, parentPath: string): SettingsTreeItem[] {
   return Object.entries(node)
@@ -72,6 +114,31 @@ function buildChildren(node: Record<string, ConfigNode>, parentPath: string): Se
         ? new SettingsValueItem(key, dotPath, value)
         : new SettingsSectionItem(key, dotPath, value as Record<string, ConfigNode>);
     });
+}
+
+/** mt-hub CLI options that persist as a config.yaml default rather than a per-run flag (-t/-r/-f/-u/-b are always explicit per-invocation and stay as tree/context-menu actions, not settings). */
+const MT_HUB_SETTINGS = ["ai.default_provider", "ai.enable_bulk_index_warning", "ai.bulk_index_warning_threshold"];
+
+/** mt-export/mt-export-cleanup CLI options that persist as a config.yaml default (schema/exclude/zip/quiet are per-run choices already covered by mt-export -i's own interactive prompts, so they're deliberately not duplicated here). */
+const MT_EXPORT_SETTINGS = [
+  "paths.export_dir",
+  "llm_exports.enable_auto_cleanup",
+  "llm_exports.auto_cleanup_days",
+  "llm_exports.warn_file_threshold",
+  "llm_exports.max_file_threshold",
+  "llm_exports.file_blocklist_regex",
+  "llm_exports.dir_ignore_glob",
+];
+
+/** Builds a flat list of SettingsValueItems for a curated set of dotPaths, skipping any that don't resolve to a leaf value in the current config.yaml (e.g. an older install pre-dating a given key -- shown once config_manager.py's own migration adds it, not a tree error before then). */
+function buildCuratedChildren(config: Record<string, ConfigNode>, dotPaths: string[]): SettingsValueItem[] {
+  const items: SettingsValueItem[] = [];
+  for (const dotPath of dotPaths) {
+    const value = resolveDotPath(config, dotPath);
+    if (value === undefined) continue;
+    items.push(new SettingsValueItem(dotPath.split(".").pop() as string, dotPath, value));
+  }
+  return items;
 }
 
 export class SettingsProvider implements vscode.TreeDataProvider<SettingsTreeItem> {
@@ -88,8 +155,19 @@ export class SettingsProvider implements vscode.TreeDataProvider<SettingsTreeIte
     return element;
   }
 
-  getChildren(element?: SettingsSectionItem): SettingsTreeItem[] {
-    if (element) return buildChildren(element.node, element.dotPath);
-    return buildChildren(readConfig(this.configPath), "");
+  getChildren(element?: SettingsTreeItem): SettingsTreeItem[] {
+    if (!element) {
+      return [
+        new SettingsGroupItem("Framework", "framework", "folder-library"),
+        new SettingsGroupItem("MT Hub", "hub", "repo"),
+        new SettingsGroupItem("MT Export", "export", "export"),
+      ];
+    }
+    if (element instanceof SettingsGroupItem) {
+      const config = readConfig(this.configPath);
+      if (element.groupKind === "framework") return buildChildren(config, "");
+      return buildCuratedChildren(config, element.groupKind === "hub" ? MT_HUB_SETTINGS : MT_EXPORT_SETTINGS);
+    }
+    return buildChildren((element as SettingsSectionItem).node, (element as SettingsSectionItem).dotPath);
   }
 }
