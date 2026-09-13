@@ -8,6 +8,7 @@ import { DockerContainerItem, DockerProvider } from "./dockerProvider";
 import { resolveFrameworkPaths, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { HelmProvider, HelmReleaseItem } from "./helmProvider";
+import { HistoryEntryItem, HistoryProvider } from "./historyProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
 import { LogProvider } from "./logProvider";
 import { MinikubeProvider } from "./minikubeProvider";
@@ -434,6 +435,68 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         .join(" && ");
       runInTerminal(command);
     }),
+
+    // Pull-if-behind: mt-bulk-update's own fast-forward-only logic already
+    // reports UNCHANGED for a repo with nothing to pull, so there's no
+    // separate "only if behind" flag to pass -- this is just the
+    // fast-forward-only pull itself, run visibly since it's a real network
+    // fetch per repo. --repo bypasses the scope/provider/workspace/project
+    // filter tree entirely for a single known path; the category/workspace
+    // variants chain one invocation per repo the same way
+    // indexWorkspaceRepos does, since mt-bulk-update's own -s scope filter
+    // happens to line up with the Repo Hub category name (the VCS_ROOT
+    // subfolder) but has nothing equivalent for the synthetic "Open in VS
+    // Code" grouping.
+    vscode.commands.registerCommand("mtDevops.pullRepoIfBehind", (item: RepoTreeItem) =>
+      runInTerminal(`mt-bulk-update --repo ${shellQuote(item.repoPath)}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.pullCategoryIfBehind", (item: RepoCategoryItem) =>
+      runInTerminal(`mt-bulk-update -s ${shellQuote(item.category.toLowerCase())}`),
+    ),
+    vscode.commands.registerCommand("mtDevops.pullWorkspaceReposIfBehind", (item: WorkspaceCategoryItem) => {
+      const command = item.repos.map(([repoPath]) => `mt-bulk-update --repo ${shellQuote(repoPath)}`).join(" && ");
+      runInTerminal(command);
+    }),
+    vscode.commands.registerCommand("mtDevops.pullAllReposIfBehind", async () => {
+      const choice = await vscode.window.showWarningMessage(
+        "Pull every repo under VCS_ROOT that's behind its remote? This fetches every repo -- never pushes, never force-merges.",
+        { modal: true },
+        "Pull All",
+      );
+      if (choice === "Pull All") runInTerminal("mt-bulk-update");
+    }),
+
+    // Push All Changes: git-ai-push-all formats, AI-groups/commits, and
+    // pushes unconditionally with no confirmation of its own -- unlike the
+    // pull actions above, this genuinely publishes to the remote, so it
+    // gets the same confirm-first treatment as indexAllRepos/
+    // pullAllReposIfBehind rather than running immediately on click.
+    vscode.commands.registerCommand("mtDevops.pushAllChanges", async (item: RepoTreeItem) => {
+      const choice = await vscode.window.showWarningMessage(
+        `Format, AI-commit, and push all changes in "${path.basename(item.repoPath)}"?`,
+        { modal: true },
+        "Push",
+      );
+      if (choice === "Push") runInTerminal(`cd ${shellQuote(item.repoPath)} && git-ai-push-all`);
+    }),
+
+    // mt-export's own -i flow already prompts for every option (dir,
+    // schema, exclusions, zip) interactively, so this just points it at
+    // the right starting directory and lets that flow run in a visible
+    // terminal -- same reasoning as indexRepo/updateRepo's own
+    // shell-outs.
+    vscode.commands.registerCommand("mtDevops.exportForLLM", (item: RepoTreeItem) =>
+      runInTerminal(`cd ${shellQuote(item.repoPath)} && mt-export -i`),
+    ),
+    // Cleanup isn't repo-scoped (it clears mt-export's own output
+    // directory, wherever AI_WORKSPACE_DIR/config.yaml points it), so
+    // this is command-palette-only rather than a per-repo action.
+    vscode.commands.registerCommand("mtDevops.exportCleanup", () => runInTerminal("mt-export-cleanup -i")),
+
+    // History: re-running is just re-sending the exact prior command text
+    // to the terminal -- no framework flag needed, since the extension
+    // already holds the literal command string from mt-history --json.
+    vscode.commands.registerCommand("mtDevops.historyRerun", (item: HistoryEntryItem) => runInTerminal(item.command_)),
   );
 
   registerAiChatParticipant(context);
@@ -455,6 +518,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerAsyncView(context, "mtDevopsKubernetes", new KubernetesProvider(), "mtDevops.refreshKubernetes");
   registerAsyncView(context, "mtDevopsHelm", new HelmProvider(), "mtDevops.refreshHelm");
   registerAsyncView(context, "mtDevopsMinikube", new MinikubeProvider(), "mtDevops.refreshMinikube");
+  registerAsyncView(context, "mtDevopsHistory", new HistoryProvider(), "mtDevops.refreshHistory");
 
   try {
     const { cacheDir, configDir, logDir, vcsRoot } = await resolveFrameworkPaths();

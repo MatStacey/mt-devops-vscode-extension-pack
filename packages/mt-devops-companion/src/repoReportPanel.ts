@@ -7,6 +7,14 @@ import * as vscode from "vscode";
 import { openNewTerminalAt, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote } from "./framework";
 import type { RepoMeta } from "./repoHubProvider";
 
+/** Same badge-style palette as other status-coded pills elsewhere in this webview, keyed by mt-hub's AI-inferred environment "type" vocabulary. */
+const ENV_TYPE_COLOR: Record<string, string> = {
+  dev: "var(--vscode-charts-blue)",
+  staging: "var(--vscode-charts-yellow)",
+  prod: "var(--vscode-charts-red)",
+  test: "var(--vscode-charts-purple)",
+};
+
 interface CommitEntry {
   hash: string;
   subject: string;
@@ -265,6 +273,20 @@ function metaRow(label: string, value: string): string {
   return `<tr><td class="label">${escapeHtml(label)}</td><td>${escapeHtml(value)}</td></tr>`;
 }
 
+function buildEnvironmentsHtml(environments: RepoMeta["environments"]): string {
+  if (!environments || environments.length === 0) return "";
+  const pills = environments
+    .map((env) => {
+      const color = ENV_TYPE_COLOR[env.type.toLowerCase()] ?? "var(--vscode-badge-background)";
+      return (
+        `<span class="envPill" style="border-color: ${color};">` +
+        `<strong>${escapeHtml(env.name)}</strong> <span class="dim">${escapeHtml(env.type)}</span></span>`
+      );
+    })
+    .join("");
+  return `<h2>Environments</h2><div class="environments">${pills}</div>`;
+}
+
 function buildCommitsHtml(commits: CommitEntry[], remote: RemoteInfo | null): string {
   if (!commits.length) return "<li class='dim'>No commits yet.</li>";
   return commits
@@ -355,6 +377,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
   }
   button:hover, .fetchBtn:hover { background: var(--vscode-button-hoverBackground); }
   #openBtn { margin-top: 0; }
+  .environments { display: flex; flex-wrap: wrap; gap: 8px; }
+  .envPill { border: 1px solid; border-radius: 12px; padding: 3px 10px; font-size: 0.9em; }
 </style>
 </head>
 <body>
@@ -373,6 +397,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     ${metaRow("Last Indexed", lastIndexed)}
   </table>
 
+  ${buildEnvironmentsHtml(meta.environments)}
+
   <h2>Recent Commits</h2>
   <ul>${buildCommitsHtml(data.commits, data.remote)}</ul>
 
@@ -384,7 +410,7 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     <button id="openBtn">Open in VS Code</button>
     ${browserButton}
     ${pullButton}
-    <button id="updateIndexBtn">Update Index (fill gaps only)</button>
+    <button id="updateIndexBtn">Update Missing Index</button>
     <button id="generateReadmeBtn">Generate/Update README</button>
     <button id="generateGitignoreBtn">Generate/Update .gitignore</button>
   </div>
