@@ -11,12 +11,14 @@ import { resolveFrameworkPaths, runFrameworkJson, runInteractiveShell, runInTerm
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { HelmProvider, HelmReleaseItem } from "./helmProvider";
 import { HistoryEntryItem, HistoryProvider } from "./historyProvider";
+import { showInfraOverview } from "./infraOverviewPanel";
 import { KubernetesProvider } from "./kubernetesProvider";
 import { LogProvider } from "./logProvider";
 import { MinikubeProvider } from "./minikubeProvider";
 import {
   BackgroundIndexingControlItem,
   getIndexModifierFlags,
+  InfraOverviewControlItem,
   RepoCategoryItem,
   RepoHubProvider,
   RepoMeta,
@@ -629,8 +631,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(
       repoHubView.onDidChangeCheckboxState((e) => {
         for (const [item, state] of e.items) {
+          const checked = state === vscode.TreeItemCheckboxState.Checked;
           if (item instanceof BackgroundIndexingControlItem) {
-            void repoHubProvider.setBackgroundIndexing(state === vscode.TreeItemCheckboxState.Checked);
+            void repoHubProvider.setBackgroundIndexing(checked);
+          } else if (item instanceof InfraOverviewControlItem) {
+            void repoHubProvider.setGenerateInfraOverview(checked);
           }
         }
       }),
@@ -665,6 +670,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const picked = await vscode.window.showQuickPick(options, { placeHolder: "Select an AI provider override for indexing" });
         if (picked) await repoHubProvider.setProviderOverride(picked.value);
       }),
+    );
+    // Standalone infra generation (the "repo's already indexed, I just
+    // want this one thing" case from the Generate Infra Overview
+    // checkbox's own doc comment) -- no AI call, so this runs visibly in
+    // the terminal like the other index/update actions rather than a
+    // captured toast, and needs no confirmation dialog either.
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.generateInfraOverview", (item: RepoTreeItem) =>
+        runInTerminal(`mt-hub --infra -r ${shellQuote(path.basename(item.repoPath))}`),
+      ),
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.showInfraOverview", (item: RepoTreeItem) => showInfraOverview(item.repoPath)),
     );
 
     const configPath = path.join(configDir, "config.yaml");

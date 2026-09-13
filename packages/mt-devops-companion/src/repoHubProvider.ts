@@ -173,6 +173,27 @@ export class ProviderOverrideControlItem extends vscode.TreeItem {
   }
 }
 
+/**
+ * A real tree checkbox controlling whether every mt-hub --index call this
+ * provider's commands build also runs --infra (see .bash.d/20-vcs/57-infra.sh)
+ * right after each repo's normal indexing step -- generating a Terraform
+ * infrastructure overview (resources by category, providers, modules) for
+ * any repo that has Terraform, skipped silently for one that doesn't. Off
+ * by default since it's an extra (cheap, no-AI) heuristic pass most index
+ * runs don't need; the standalone "Generate Infrastructure Overview"
+ * context-menu action covers the "repo's already indexed, I just want
+ * this one thing" case without needing this ticked at all.
+ */
+export class InfraOverviewControlItem extends vscode.TreeItem {
+  constructor(enabled: boolean) {
+    super("Generate Infra Overview", vscode.TreeItemCollapsibleState.None);
+    this.checkboxState = enabled ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
+    this.description = enabled ? "On -- runs --infra after indexing" : "Off";
+    this.iconPath = new vscode.ThemeIcon("server-environment");
+    this.contextValue = "mtDevopsHubInfraToggle";
+  }
+}
+
 class RepoErrorItem extends vscode.TreeItem {
   constructor(message: string) {
     super(message, vscode.TreeItemCollapsibleState.None);
@@ -270,25 +291,27 @@ function findOpenWorkspaceRepos(cacheEntries: Array<[string, RepoMeta]>): Array<
 const FAVORITES_STATE_KEY = "mtDevops.favoriteRepoPaths";
 const BACKGROUND_INDEXING_STATE_KEY = "mtDevops.backgroundIndexing";
 const PROVIDER_OVERRIDE_STATE_KEY = "mtDevops.providerOverride";
+const INFRA_OVERVIEW_STATE_KEY = "mtDevops.generateInfraOverview";
 
 /**
  * Builds the extra mt-hub --index flags implied by the sidebar's
- * Background Indexing checkbox / AI Provider Override row -- appended
- * verbatim to every index/update command built anywhere in extension.ts
- * (context menus, title-bar buttons, and the Explorer counterparts, some
- * of which are registered before RepoHubProvider itself exists). Reads
- * the same globalState keys RepoHubProvider's own instance methods use,
- * so it's a free function rather than a provider method -- a shared
- * store, not state owned by one object. Provider values only ever come
- * from the fixed quick-pick list in extension.ts (gemini/claude/
- * claude-code/local), never free-typed input, so no shell-quoting is
- * needed here.
+ * Background Indexing / Generate Infra Overview checkboxes and the AI
+ * Provider Override row -- appended verbatim to every index/update
+ * command built anywhere in extension.ts (context menus, title-bar
+ * buttons, and the Explorer counterparts, some of which are registered
+ * before RepoHubProvider itself exists). Reads the same globalState keys
+ * RepoHubProvider's own instance methods use, so it's a free function
+ * rather than a provider method -- a shared store, not state owned by
+ * one object. Provider values only ever come from the fixed quick-pick
+ * list in extension.ts (gemini/claude/claude-code/local), never
+ * free-typed input, so no shell-quoting is needed here.
  */
 export function getIndexModifierFlags(state: vscode.Memento): string {
   const parts: string[] = [];
   if (state.get(BACKGROUND_INDEXING_STATE_KEY, false)) parts.push("-b");
   const provider = state.get(PROVIDER_OVERRIDE_STATE_KEY, "");
   if (provider) parts.push("-p", provider);
+  if (state.get(INFRA_OVERVIEW_STATE_KEY, false)) parts.push("--infra");
   return parts.length > 0 ? ` ${parts.join(" ")}` : "";
 }
 
@@ -335,6 +358,15 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
     this.refresh();
   }
 
+  getGenerateInfraOverview(): boolean {
+    return this.state.get(INFRA_OVERVIEW_STATE_KEY, false);
+  }
+
+  async setGenerateInfraOverview(value: boolean): Promise<void> {
+    await this.state.update(INFRA_OVERVIEW_STATE_KEY, value);
+    this.refresh();
+  }
+
   refresh(): void {
     this._onDidChangeTreeData.fire();
   }
@@ -374,10 +406,12 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
       const summary = new SummaryItem(cacheEntries.length, needsIndex, dirtyCount);
       const backgroundItem = new BackgroundIndexingControlItem(this.getBackgroundIndexing());
       const providerItem = new ProviderOverrideControlItem(this.getProviderOverride());
+      const infraItem = new InfraOverviewControlItem(this.getGenerateInfraOverview());
 
       return [
         backgroundItem,
         providerItem,
+        infraItem,
         summary,
         ...favoritesSection,
         ...workspaceSection,
