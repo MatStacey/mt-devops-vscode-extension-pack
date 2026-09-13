@@ -362,7 +362,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   registerAsyncView(context, "mtDevopsStatus", new StatusProvider(), "mtDevops.refreshStatus");
   registerAsyncView(context, "mtDevopsDoctor", new DoctorProvider(), "mtDevops.refreshDoctor");
-  registerAsyncView(context, "mtDevopsDocker", new DockerProvider(), "mtDevops.refreshDocker");
+  const dockerProvider = new DockerProvider(context.globalState);
+  registerAsyncView(context, "mtDevopsDocker", dockerProvider, "mtDevops.refreshDocker");
+  context.subscriptions.push(
+    vscode.commands.registerCommand("mtDevops.toggleDockerGroupByRepo", () => dockerProvider.toggleGroupByRepo()),
+  );
   registerAsyncView(context, "mtDevopsKubernetes", new KubernetesProvider(), "mtDevops.refreshKubernetes");
   registerAsyncView(context, "mtDevopsHelm", new HelmProvider(), "mtDevops.refreshHelm");
   registerAsyncView(context, "mtDevopsMinikube", new MinikubeProvider(), "mtDevops.refreshMinikube");
