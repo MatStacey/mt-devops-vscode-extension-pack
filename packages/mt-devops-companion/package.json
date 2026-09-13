@@ -102,6 +102,21 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "mtDevops.refreshHelm",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mtDevops.refreshMinikube",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mtDevops.helmUninstall",
+        "title": "Uninstall Release",
+        "icon": "$(trash)"
+      },
+      {
         "command": "mtDevops.dockerStart",
         "title": "Start Container",
         "icon": "$(play)"
@@ -260,6 +275,14 @@
         {
           "id": "mtDevopsKubernetes",
           "name": "Kubernetes"
+        },
+        {
+          "id": "mtDevopsHelm",
+          "name": "Helm"
+        },
+        {
+          "id": "mtDevopsMinikube",
+          "name": "Minikube"
         }
       ]
     },
@@ -376,6 +399,16 @@
           "group": "navigation"
         },
         {
+          "command": "mtDevops.refreshHelm",
+          "when": "view == mtDevopsHelm",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.refreshMinikube",
+          "when": "view == mtDevopsMinikube",
+          "group": "navigation"
+        },
+        {
           "command": "mtDevops.jobsClearFinished",
           "when": "view == mtDevopsJobs",
           "group": "navigation"
@@ -481,6 +514,11 @@
           "command": "mtDevops.editConfigValue",
           "when": "view == mtDevopsSettings && viewItem == mtDevopsSettingsValue",
           "group": "1_manage@1"
+        },
+        {
+          "command": "mtDevops.helmUninstall",
+          "when": "view == mtDevopsHelm && viewItem == mtDevopsHelmRelease",
+          "group": "9_cleanup"
         }
       ]
     }

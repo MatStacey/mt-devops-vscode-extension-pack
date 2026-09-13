@@ -6,8 +6,10 @@ import { DoctorProvider } from "./doctorProvider";
 import { DockerContainerItem, DockerProvider } from "./dockerProvider";
 import { resolveFrameworkPaths, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
+import { HelmProvider, HelmReleaseItem } from "./helmProvider";
 import { KubernetesProvider } from "./kubernetesProvider";
 import { LogProvider } from "./logProvider";
+import { MinikubeProvider } from "./minikubeProvider";
 import { RepoCategoryItem, RepoHubProvider, RepoMeta, RepoTreeItem, WorkspaceCategoryItem } from "./repoHubProvider";
 import { showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
@@ -197,6 +199,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       runInTerminal(`__docker_container_shell ${shellQuote(item.containerName)}`),
     ),
 
+    // Helm: uninstall runs in a visible terminal, not captured -- unlike
+    // Jobs/Secrets' fast one-shot actions, helm-uninstall's own
+    // __k8s_confirm_destructive guard needs a real /dev/tty (and adds a
+    // genuinely useful extra check this dialog can't: refusing a
+    // prod-looking context/namespace without typing "yes"), so this
+    // confirmation is a first pass, not a replacement for that one.
+    vscode.commands.registerCommand("mtDevops.helmUninstall", async (item: HelmReleaseItem) => {
+      const choice = await vscode.window.showWarningMessage(
+        `Uninstall the Helm release "${item.releaseName}" (namespace: ${item.namespace})? This can't be undone.`,
+        { modal: true },
+        "Uninstall",
+      );
+      if (choice !== "Uninstall") return;
+      runInTerminal(`helm-uninstall ${shellQuote(item.releaseName)} -n ${shellQuote(item.namespace)}`);
+    }),
+
     // Jobs: per-job actions plus a bulk "clear finished" -- restart/stop/
     // remove are fast, one-shot mt-jobs mutations (see the framework's
     // --restart/--stop/--remove flags), so they run captured rather than
@@ -346,6 +364,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerAsyncView(context, "mtDevopsDoctor", new DoctorProvider(), "mtDevops.refreshDoctor");
   registerAsyncView(context, "mtDevopsDocker", new DockerProvider(), "mtDevops.refreshDocker");
   registerAsyncView(context, "mtDevopsKubernetes", new KubernetesProvider(), "mtDevops.refreshKubernetes");
+  registerAsyncView(context, "mtDevopsHelm", new HelmProvider(), "mtDevops.refreshHelm");
+  registerAsyncView(context, "mtDevopsMinikube", new MinikubeProvider(), "mtDevops.refreshMinikube");
 
   try {
     const { cacheDir, configDir, logDir, vcsRoot } = await resolveFrameworkPaths();
