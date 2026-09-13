@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
 import { openNewTerminalAt, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote } from "./framework";
+import { getIndexModifierFlags } from "./repoHubProvider";
 import type { RepoMeta } from "./repoHubProvider";
 
 /** Same badge-style palette as other status-coded pills elsewhere in this webview, keyed by mt-hub's AI-inferred environment "type" vocabulary. */
@@ -721,6 +722,17 @@ let activePanel: vscode.WebviewPanel | undefined;
 // button after viewing 3 repos would act on all 3.
 let displayedRepoPath = "";
 let displayedMeta: RepoMeta = {};
+// Set once from extension.ts (same context.globalState the Repo Hub tree's
+// Background Indexing checkbox / AI Provider Override row write to) so the
+// report panel's own "Update Missing Index" button honors the same
+// sidebar-configured flags as every other mt-hub --index call site,
+// without needing showRepoReport's own signature (and all its call sites)
+// to thread a Memento through just for this one button.
+let extensionState: vscode.Memento | undefined;
+
+export function initRepoReportPanel(state: vscode.Memento): void {
+  extensionState = state;
+}
 
 async function refreshPanel(): Promise<void> {
   if (!activePanel) return;
@@ -806,7 +818,9 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
           // refresh itself once mt-hub rewrites it -- same reasoning as
           // the equivalent right-click actions, so this runs visibly in
           // the terminal rather than captured.
-          runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(displayedRepoPath))}`);
+          runInTerminal(
+            `mt-hub --index -u -r ${shellQuote(path.basename(displayedRepoPath))}${extensionState ? getIndexModifierFlags(extensionState) : ""}`,
+          );
           return;
         }
         if (message.command === "openInBrowser") {

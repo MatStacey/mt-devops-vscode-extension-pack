@@ -218,6 +218,10 @@
         "icon": "$(star-full)"
       },
       {
+        "command": "mtDevops.hubChangeProviderOverride",
+        "title": "Change AI Provider Override"
+      },
+      {
         "command": "mtDevops.indexCategory",
         "title": "Index All in Category",
         "icon": "$(sync)"
