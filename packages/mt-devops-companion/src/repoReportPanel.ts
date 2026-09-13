@@ -26,6 +26,14 @@ interface RemoteInfo {
   webUrl: string;
   /** e.g. "https://github.com/MatStacey/mt-devops-framework/commit/" -- append a hash directly. */
   commitUrlBase: string;
+  /** "owner/repo", only set for a github.com remote -- what `gh`'s own --repo flag expects. Null for every other host (Bitbucket, self-hosted GitLab, ...), since `gh` only ever talks to GitHub. */
+  ghSlug: string | null;
+}
+
+interface GithubStatus {
+  openPrCount: number;
+  ciConclusion: string | null;
+  ciUrl: string | null;
 }
 
 interface BranchInfo {
@@ -60,6 +68,7 @@ interface ReportData {
   readmeStaleDays: number | null;
   hasDockerCompose: boolean;
   hasHelmChart: boolean;
+  github: GithubStatus | null;
 }
 
 /** A Compose file at the repo root -- the same thing DockerProvider's "group by repository" keys off of (com.docker.compose.project.working_dir), so this is "does the Docker panel have anything for this repo", not a generic Docker-usage guess. */
@@ -152,7 +161,71 @@ function parseRemoteUrl(remoteUrl: string): RemoteInfo | null {
   repoPath = repoPath.replace(/\.git$/, "").replace(/\/+$/, "");
   const webUrl = `https://${host}/${repoPath}`;
   const commitSegment = host === "bitbucket.org" ? "commits" : "commit";
-  return { webUrl, commitUrlBase: `${webUrl}/${commitSegment}/` };
+  return { webUrl, commitUrlBase: `${webUrl}/${commitSegment}/`, ghSlug: host === "github.com" ? repoPath : null };
+}
+
+/** Memoized per activation -- `gh --version` is a cheap, static fact about this machine, not worth re-checking on every single report render. */
+let ghAvailableCache: Promise<boolean> | undefined;
+function isGhAvailable(): Promise<boolean> {
+  if (!ghAvailableCache) {
+    ghAvailableCache = new Promise((resolve) => {
+      execFile("gh", ["--version"], (error) => resolve(!error));
+    });
+  }
+  return ghAvailableCache;
+}
+
+/**
+ * Open PR count and the default branch's latest CI run, both via `gh`
+ * (already relied on elsewhere in this ecosystem for PR/merge workflows)
+ * rather than a new framework command -- GitHub-only for now, since `gh`
+ * itself only ever talks to GitHub; resolves null on any failure (not
+ * installed, not authenticated, private repo without access, ...) so a
+ * repo report never blocks or errors on this being unavailable.
+ */
+function fetchGithubStatus(slug: string): Promise<GithubStatus | null> {
+  return new Promise((resolve) => {
+    execFile(
+      "gh",
+      ["pr", "list", "--repo", slug, "--state", "open", "--json", "number"],
+      { maxBuffer: 1024 * 1024 },
+      (prError, prStdout) => {
+        if (prError) {
+          resolve(null);
+          return;
+        }
+        let openPrCount = 0;
+        try {
+          openPrCount = (JSON.parse(prStdout) as unknown[]).length;
+        } catch {
+          resolve(null);
+          return;
+        }
+
+        execFile(
+          "gh",
+          ["run", "list", "--repo", slug, "--limit", "1", "--json", "conclusion,status,url"],
+          { maxBuffer: 1024 * 1024 },
+          (runError, runStdout) => {
+            let ciConclusion: string | null = null;
+            let ciUrl: string | null = null;
+            if (!runError) {
+              try {
+                const runs = JSON.parse(runStdout) as Array<{ conclusion: string; status: string; url: string }>;
+                if (runs.length > 0) {
+                  ciConclusion = runs[0].status === "completed" ? runs[0].conclusion : runs[0].status;
+                  ciUrl = runs[0].url;
+                }
+              } catch {
+                // No workflow runs, or gh's output changed shape -- leave CI status null rather than fail the whole report over it.
+              }
+            }
+            resolve({ openPrCount, ciConclusion, ciUrl });
+          },
+        );
+      },
+    );
+  });
 }
 
 /** Local branch names, via `git branch --format`, not the interactive picker used elsewhere. */
@@ -303,6 +376,12 @@ async function collectReportData(repoPath: string): Promise<ReportData> {
   ]);
 
   const branches = remoteBranches.map((b) => ({ ...b, hasLocal: localBranches.has(b.name) }));
+
+  let github: GithubStatus | null = null;
+  if (remote?.ghSlug && (await isGhAvailable())) {
+    github = await fetchGithubStatus(remote.ghSlug);
+  }
+
   return {
     commits,
     remote,
@@ -312,6 +391,7 @@ async function collectReportData(repoPath: string): Promise<ReportData> {
     readmeStaleDays,
     hasDockerCompose: detectDockerCompose(repoPath),
     hasHelmChart: detectHelmChart(repoPath),
+    github,
   };
 }
 
@@ -340,6 +420,20 @@ function buildEnvironmentsHtml(environments: RepoMeta["environments"]): string {
     })
     .join("");
   return `<h2>Environments</h2><div class="environments">${pills}</div>`;
+}
+
+const CI_ICON: Record<string, string> = { success: "✅", failure: "❌", cancelled: "⏹️", in_progress: "⏳", queued: "⏳" };
+
+function buildGithubHtml(github: GithubStatus | null, webUrl: string | undefined): string {
+  if (!github || !webUrl) return "";
+  const prLine = `<a href="${escapeHtml(webUrl)}/pulls">${github.openPrCount} open PR${github.openPrCount === 1 ? "" : "s"}</a>`;
+  let ciLine = "";
+  if (github.ciConclusion) {
+    const icon = CI_ICON[github.ciConclusion] ?? "❔";
+    const text = `${icon} CI: ${escapeHtml(github.ciConclusion)}`;
+    ciLine = ` · ${github.ciUrl ? `<a href="${escapeHtml(github.ciUrl)}">${text}</a>` : text}`;
+  }
+  return `<h2>GitHub</h2><div>${prLine}${ciLine}</div>`;
 }
 
 function buildCommitsHtml(commits: CommitEntry[], remote: RemoteInfo | null): string {
@@ -460,6 +554,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
   </table>
 
   ${buildEnvironmentsHtml(meta.environments)}
+
+  ${buildGithubHtml(data.github, data.remote?.webUrl)}
 
   <h2>Recent Commits</h2>
   <ul>${buildCommitsHtml(data.commits, data.remote)}</ul>
