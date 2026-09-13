@@ -97,6 +97,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "mtDevops.toggleDockerGroupByRepo",
+        "title": "Toggle Group by Repository",
+        "icon": "$(list-tree)"
+      },
+      {
         "command": "mtDevops.refreshKubernetes",
         "title": "Refresh",
         "icon": "$(refresh)"
@@ -390,6 +395,11 @@
         },
         {
           "command": "mtDevops.refreshDocker",
+          "when": "view == mtDevopsDocker",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.toggleDockerGroupByRepo",
           "when": "view == mtDevopsDocker",
           "group": "navigation"
         },
