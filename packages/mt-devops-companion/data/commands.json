@@ -446,7 +446,7 @@
   {
     "id": "mtDevops.catalog.ai_explain",
     "command": "ai-explain",
-    "description": "AI: Explain a terminal command in detail, grounding the explanation in",
+    "description": "AI: Explain a terminal command in detail, grounding the explanation in its",
     "category": "AI Workflows & LLM API Integration"
   },
   {
@@ -1000,6 +1000,12 @@
     "command": "mt-bulk-update",
     "description": "Git: Bulk-update every local repository under VCS_ROOT -- fetches each",
     "category": "Git: Bulk Repository Updates"
+  },
+  {
+    "id": "mtDevops.catalog.mt_audit_deps",
+    "command": "mt-audit-deps",
+    "description": "Repo: Run a dependency vulnerability audit for the current directory's",
+    "category": "Git: Dependency Vulnerability Audit"
   },
   {
     "id": "mtDevops.catalog.google_fmt",
