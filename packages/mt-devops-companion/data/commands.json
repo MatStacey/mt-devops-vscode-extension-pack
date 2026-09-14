@@ -552,9 +552,9 @@
     "category": "Configuration Management"
   },
   {
-    "id": "mtDevops.catalog.mt_set_hub_index_warning_threshold",
-    "command": "mt-set-hub-index-warning-threshold",
-    "description": "Config: Set how many repos mt-hub --index can be about to actually",
+    "id": "mtDevops.catalog.mt_set_radar_index_warning_threshold",
+    "command": "mt-set-radar-index-warning-threshold",
+    "description": "Config: Set how many repos mt-radar --index can be about to actually",
     "category": "Configuration Management"
   },
   {
@@ -630,9 +630,9 @@
     "category": "Configuration Management"
   },
   {
-    "id": "mtDevops.catalog.mt_toggle_hub_index_warning",
-    "command": "mt-toggle-hub-index-warning",
-    "description": "Config: Toggle mt-hub --index's bulk-indexing quota warning (true/false)",
+    "id": "mtDevops.catalog.mt_toggle_radar_index_warning",
+    "command": "mt-toggle-radar-index-warning",
+    "description": "Config: Toggle mt-radar --index's bulk-indexing quota warning (true/false)",
     "category": "Configuration Management"
   },
   {
@@ -1154,8 +1154,14 @@
   {
     "id": "mtDevops.catalog.mt_hub",
     "command": "mt-hub",
+    "description": "Repo Radar: Deprecated name for mt-radar, kept as a thin forwarding",
+    "category": "MT Repo Radar - AI & Heuristic Metadata Dashboard"
+  },
+  {
+    "id": "mtDevops.catalog.mt_radar",
+    "command": "mt-radar",
     "description": "System: Interactive AI-powered Repository Dashboard. An unfiltered",
-    "category": "MT Repo Hub - AI & Heuristic Metadata Dashboard"
+    "category": "MT Repo Radar - AI & Heuristic Metadata Dashboard"
   },
   {
     "id": "mtDevops.catalog.mt",

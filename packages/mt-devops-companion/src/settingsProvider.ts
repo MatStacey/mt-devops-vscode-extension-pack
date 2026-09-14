@@ -51,8 +51,8 @@ export function readConfigValue(configPath: string, dotPath: string): ConfigValu
 /**
  * The three fixed top-level roots of the Settings tree: "Framework" is the
  * full config.yaml tree exactly as before (every section, alphabetized),
- * while "MT Hub" and "MT Export" are curated shortcuts pointing at the
- * subset of that same config.yaml that backs `mt-hub`/`mt-export`'s own
+ * while "MT Radar" and "MT Export" are curated shortcuts pointing at the
+ * subset of that same config.yaml that backs `mt-radar`/`mt-export`'s own
  * CLI defaults -- editing a curated entry writes to the identical dotPath
  * as its Framework-tree counterpart (same mtDevops.editConfigValue command,
  * same config_manager.py write path), so there's exactly one source of
@@ -61,7 +61,7 @@ export function readConfigValue(configPath: string, dotPath: string): ConfigValu
 export class SettingsGroupItem extends vscode.TreeItem {
   constructor(
     label: string,
-    public readonly groupKind: "framework" | "hub" | "export",
+    public readonly groupKind: "framework" | "radar" | "export",
     icon: string,
   ) {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
@@ -116,8 +116,8 @@ function buildChildren(node: Record<string, ConfigNode>, parentPath: string): Se
     });
 }
 
-/** mt-hub CLI options that persist as a config.yaml default rather than a per-run flag (-t/-r/-f/-u/-b are always explicit per-invocation and stay as tree/context-menu actions, not settings). */
-const MT_HUB_SETTINGS = ["ai.default_provider", "ai.enable_bulk_index_warning", "ai.bulk_index_warning_threshold"];
+/** mt-radar CLI options that persist as a config.yaml default rather than a per-run flag (-t/-r/-f/-u/-b are always explicit per-invocation and stay as tree/context-menu actions, not settings). */
+const MT_RADAR_SETTINGS = ["ai.default_provider", "ai.enable_bulk_index_warning", "ai.bulk_index_warning_threshold"];
 
 /** mt-export/mt-export-cleanup CLI options that persist as a config.yaml default (schema/exclude/zip/quiet are per-run choices already covered by mt-export -i's own interactive prompts, so they're deliberately not duplicated here). */
 const MT_EXPORT_SETTINGS = [
@@ -159,14 +159,14 @@ export class SettingsProvider implements vscode.TreeDataProvider<SettingsTreeIte
     if (!element) {
       return [
         new SettingsGroupItem("Framework", "framework", "folder-library"),
-        new SettingsGroupItem("MT Hub", "hub", "repo"),
+        new SettingsGroupItem("MT Radar", "radar", "repo"),
         new SettingsGroupItem("MT Export", "export", "export"),
       ];
     }
     if (element instanceof SettingsGroupItem) {
       const config = readConfig(this.configPath);
       if (element.groupKind === "framework") return buildChildren(config, "");
-      return buildCuratedChildren(config, element.groupKind === "hub" ? MT_HUB_SETTINGS : MT_EXPORT_SETTINGS);
+      return buildCuratedChildren(config, element.groupKind === "radar" ? MT_RADAR_SETTINGS : MT_EXPORT_SETTINGS);
     }
     return buildChildren((element as SettingsSectionItem).node, (element as SettingsSectionItem).dotPath);
   }

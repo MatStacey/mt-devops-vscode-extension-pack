@@ -20,11 +20,11 @@ import {
   getIndexModifierFlags,
   InfraOverviewControlItem,
   RepoCategoryItem,
-  RepoHubProvider,
+  RepoRadarProvider,
   RepoMeta,
   RepoTreeItem,
   WorkspaceCategoryItem,
-} from "./repoHubProvider";
+} from "./repoRadarProvider";
 import { initRepoReportPanel, runAiUpdateFlow, showRepoReport } from "./repoReportPanel";
 import { SecretsProvider, SecretTreeItem } from "./secretsProvider";
 import { readConfigValue, SettingsValueItem, SettingsProvider } from "./settingsProvider";
@@ -54,12 +54,12 @@ function loadCatalog(extensionUri: vscode.Uri): CatalogEntry[] {
  * Resolves the Explorer right-click target for a repo-scoped command
  * (index/update/show report), verifying it's a directory and the root
  * of an actual git repository -- `test -e` semantics (not `-d`), same
- * as the framework's own __mt_hub_find_repos, so a worktree checkout
+ * as the framework's own __mt_radar_find_repos, so a worktree checkout
  * (".git" is a file there) still counts. Returns undefined (after
  * showing the user why) for anything else: no selection, a file, or a
  * folder that just happens to sit inside/near a repo without being its
  * root. These commands only make sense against a repo root since
- * mt-hub's own -r/--repo filter matches by exact basename.
+ * mt-radar's own -r/--repo filter matches by exact basename.
  */
 function resolveRepoRootTarget(uri: vscode.Uri | undefined): string | undefined {
   const target = uri ?? vscode.window.activeTextEditor?.document.uri;
@@ -79,7 +79,7 @@ function resolveRepoRootTarget(uri: vscode.Uri | undefined): string | undefined 
   return folderPath;
 }
 
-/** Open workspace folders that are actually git repos (checks for ".git", same test as resolveRepoRootTarget/mt-hub's own repo detection). */
+/** Open workspace folders that are actually git repos (checks for ".git", same test as resolveRepoRootTarget/mt-radar's own repo detection). */
 function openWorkspaceRepoPaths(): string[] {
   const folders = vscode.workspace.workspaceFolders ?? [];
   return folders.map((f) => f.uri.fsPath).filter((p) => fs.existsSync(path.join(p, ".git")));
@@ -115,7 +115,7 @@ async function pickRepoPath(uri: vscode.Uri | undefined): Promise<string | undef
 }
 
 /**
- * Runs a quick, non-interactive mt-jobs/mt-hub mutation (job
+ * Runs a quick, non-interactive mt-jobs/mt-radar mutation (job
  * restart/stop/remove) via a captured shell call rather than a visible
  * terminal -- these finish in well under a second and their own
  * tree view already auto-refreshes from a file watcher once the
@@ -207,22 +207,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       runInTerminal(`mt-copy ${shellQuote(target.fsPath)}`);
     }),
-    // Explorer counterparts to the Repo Hub tree's own right-click "Index
+    // Explorer counterparts to the Repo Radar tree's own right-click "Index
     // This Repo"/"Update This Repo" -- let a repo be (re)indexed from
     // wherever it's already open in the editor, without needing to also
-    // find it in the Repo Hub sidebar. resolveRepoRootTarget guards all
+    // find it in the Repo Radar sidebar. resolveRepoRootTarget guards all
     // three of these against a non-folder selection or a folder that
-    // isn't actually a repo root, since mt-hub's own -r/--repo match is
+    // isn't actually a repo root, since mt-radar's own -r/--repo match is
     // an exact basename match.
     vscode.commands.registerCommand("mtDevops.indexRepoFromExplorer", (uri: vscode.Uri | undefined) => {
       const repoPath = resolveRepoRootTarget(uri);
       if (!repoPath) return;
-      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(repoPath))}${getIndexModifierFlags(context.globalState)}`);
+      runInTerminal(`mt-radar --index -f -r ${shellQuote(path.basename(repoPath))}${getIndexModifierFlags(context.globalState)}`);
     }),
     vscode.commands.registerCommand("mtDevops.updateRepoIndexFromExplorer", (uri: vscode.Uri | undefined) => {
       const repoPath = resolveRepoRootTarget(uri);
       if (!repoPath) return;
-      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}${getIndexModifierFlags(context.globalState)}`);
+      runInTerminal(`mt-radar --index -u -r ${shellQuote(path.basename(repoPath))}${getIndexModifierFlags(context.globalState)}`);
     }),
 
     // Command-palette/Explorer counterparts to the Repo Report panel's own
@@ -392,14 +392,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       );
     }),
 
-    // Repo Hub: click opens the report webview (registered below via
-    // repoHubProvider.ts's own tree-item command); right-click offers
+    // Repo Radar: click opens the report webview (registered below via
+    // repoRadarProvider.ts's own tree-item command); right-click offers
     // "Open in VS Code" plus per-repo/per-category index & update.
-    // Index/update shell out to mt-hub --index, which can take a while
+    // Index/update shell out to mt-radar --index, which can take a while
     // (an AI call per un-cached or gapped repo) -- run visibly in the
     // terminal so progress is watchable, same reasoning as bulk repo
-    // scans elsewhere in this extension. The Repo Hub tree already
-    // watches .vcs_hub.json, so it refreshes itself once mt-hub writes
+    // scans elsewhere in this extension. The Repo Radar tree already
+    // watches .vcs_radar.json, so it refreshes itself once mt-radar writes
     // the updated cache -- no manual refresh needed here either.
     vscode.commands.registerCommand("mtDevops.showRepoReport", (item: RepoTreeItem) =>
       showRepoReport(item.repoPath, item.meta),
@@ -408,16 +408,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.repoPath), { forceNewWindow: true }),
     ),
     vscode.commands.registerCommand("mtDevops.indexRepo", (item: RepoTreeItem) =>
-      runInTerminal(`mt-hub --index -f -r ${shellQuote(path.basename(item.repoPath))}${getIndexModifierFlags(context.globalState)}`),
+      runInTerminal(`mt-radar --index -f -r ${shellQuote(path.basename(item.repoPath))}${getIndexModifierFlags(context.globalState)}`),
     ),
     vscode.commands.registerCommand("mtDevops.updateRepo", (item: RepoTreeItem) =>
-      runInTerminal(`mt-hub --index -u -r ${shellQuote(path.basename(item.repoPath))}${getIndexModifierFlags(context.globalState)}`),
+      runInTerminal(`mt-radar --index -u -r ${shellQuote(path.basename(item.repoPath))}${getIndexModifierFlags(context.globalState)}`),
     ),
     vscode.commands.registerCommand("mtDevops.indexCategory", (item: RepoCategoryItem) =>
-      runInTerminal(`mt-hub --index -f -t ${shellQuote(item.category)}${getIndexModifierFlags(context.globalState)}`),
+      runInTerminal(`mt-radar --index -f -t ${shellQuote(item.category)}${getIndexModifierFlags(context.globalState)}`),
     ),
     vscode.commands.registerCommand("mtDevops.updateCategory", (item: RepoCategoryItem) =>
-      runInTerminal(`mt-hub --index -u -t ${shellQuote(item.category)}${getIndexModifierFlags(context.globalState)}`),
+      runInTerminal(`mt-radar --index -u -t ${shellQuote(item.category)}${getIndexModifierFlags(context.globalState)}`),
     ),
     vscode.commands.registerCommand("mtDevops.indexAllRepos", async () => {
       const choice = await vscode.window.showWarningMessage(
@@ -425,13 +425,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         { modal: true },
         "Index All",
       );
-      if (choice === "Index All") runInTerminal(`mt-hub --index -f${getIndexModifierFlags(context.globalState)}`);
+      if (choice === "Index All") runInTerminal(`mt-radar --index -f${getIndexModifierFlags(context.globalState)}`);
     }),
     vscode.commands.registerCommand("mtDevops.updateAllRepos", () =>
-      runInTerminal(`mt-hub --index -u${getIndexModifierFlags(context.globalState)}`),
+      runInTerminal(`mt-radar --index -u${getIndexModifierFlags(context.globalState)}`),
     ),
     // The "Open in VS Code" section is a curated set of repo names, not
-    // a real mt-hub -t/--type folder, so there's no single filter that
+    // a real mt-radar -t/--type folder, so there's no single filter that
     // covers it the way indexCategory/updateCategory's -t does -- chain
     // one -r invocation per repo instead, same flag each already uses
     // per-repo. No confirmation dialog, matching indexCategory's own
@@ -440,14 +440,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("mtDevops.indexWorkspaceRepos", (item: WorkspaceCategoryItem) => {
       const flags = getIndexModifierFlags(context.globalState);
       const command = item.repos
-        .map(([repoPath]) => `mt-hub --index -f -r ${shellQuote(path.basename(repoPath))}${flags}`)
+        .map(([repoPath]) => `mt-radar --index -f -r ${shellQuote(path.basename(repoPath))}${flags}`)
         .join(" && ");
       runInTerminal(command);
     }),
     vscode.commands.registerCommand("mtDevops.updateWorkspaceRepos", (item: WorkspaceCategoryItem) => {
       const flags = getIndexModifierFlags(context.globalState);
       const command = item.repos
-        .map(([repoPath]) => `mt-hub --index -u -r ${shellQuote(path.basename(repoPath))}${flags}`)
+        .map(([repoPath]) => `mt-radar --index -u -r ${shellQuote(path.basename(repoPath))}${flags}`)
         .join(" && ");
       runInTerminal(command);
     }),
@@ -460,7 +460,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // filter tree entirely for a single known path; the category/workspace
     // variants chain one invocation per repo the same way
     // indexWorkspaceRepos does, since mt-bulk-update's own -s scope filter
-    // happens to line up with the Repo Hub category name (the VCS_ROOT
+    // happens to line up with the Repo Radar category name (the VCS_ROOT
     // subfolder) but has nothing equivalent for the synthetic "Open in VS
     // Code" grouping.
     vscode.commands.registerCommand("mtDevops.pullRepoIfBehind", (item: RepoTreeItem) =>
@@ -514,8 +514,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // already holds the literal command string from mt-history --json.
     vscode.commands.registerCommand("mtDevops.historyRerun", (item: HistoryEntryItem) => runInTerminal(item.command_)),
 
-    // Search Repos: mt-hub --search only ever looks at the already-cached
-    // .vcs_hub.json (name/description/category/stack), same fields
+    // Search Repos: mt-radar --search only ever looks at the already-cached
+    // .vcs_radar.json (name/description/category/stack), same fields
     // RepoMeta already carries -- so a picked result can go straight into
     // showRepoReport without a second cache read.
     vscode.commands.registerCommand("mtDevops.searchRepos", async () => {
@@ -531,7 +531,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       let results: SearchResult[];
       try {
-        results = await runFrameworkJson<SearchResult[]>(`mt-hub --search ${shellQuote(term)} --json`);
+        results = await runFrameworkJson<SearchResult[]>(`mt-radar --search ${shellQuote(term)} --json`);
       } catch (err) {
         vscode.window.showErrorMessage(`MT DevOps: search failed -- ${err instanceof Error ? err.message : String(err)}`);
         return;
@@ -579,9 +579,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   try {
     const { cacheDir, configDir, logDir, vcsRoot } = await resolveFrameworkPaths();
 
-    // Explorer counterpart to the Repo Hub tree's own click-to-open
-    // report -- reads the same .vcs_hub.json cache by exact absolute
-    // path (no basename fallback needed here, unlike mt-hub --preview's
+    // Explorer counterpart to the Repo Radar tree's own click-to-open
+    // report -- reads the same .vcs_radar.json cache by exact absolute
+    // path (no basename fallback needed here, unlike mt-radar --preview's
     // CLI convenience, since Explorer already gives us the exact path).
     // A repo that's never been indexed just gets an empty meta object;
     // showRepoReport already renders every field as "Unknown"/"None" in
@@ -592,7 +592,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (!repoPath) return;
         let meta: RepoMeta = {};
         try {
-          const cache = JSON.parse(fs.readFileSync(path.join(cacheDir, ".vcs_hub.json"), "utf8")) as Record<
+          const cache = JSON.parse(fs.readFileSync(path.join(cacheDir, ".vcs_radar.json"), "utf8")) as Record<
             string,
             RepoMeta
           >;
@@ -612,30 +612,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       new JobsProvider(path.join(cacheDir, ".mt_jobs.tsv")),
       "mtDevops.refreshJobs",
     );
-    const repoHubProvider = new RepoHubProvider(path.join(cacheDir, ".vcs_hub.json"), vcsRoot, context.globalState);
+    const repoRadarProvider = new RepoRadarProvider(path.join(cacheDir, ".vcs_radar.json"), vcsRoot, context.globalState);
     initRepoReportPanel(context.globalState);
     // Registered manually (not via registerWatchedView) because the
     // Background Indexing checkbox row needs TreeView.onDidChangeCheckboxState,
     // an event that lives on the view object itself, not the data provider
     // -- same reasoning as the Export Wizard's own file-exclude checkboxes.
-    const repoHubView = vscode.window.createTreeView("mtDevopsRepoHub", { treeDataProvider: repoHubProvider });
-    context.subscriptions.push(repoHubView);
+    const repoRadarView = vscode.window.createTreeView("mtDevopsRepoRadar", { treeDataProvider: repoRadarProvider });
+    context.subscriptions.push(repoRadarView);
     context.subscriptions.push(
-      vscode.commands.registerCommand("mtDevops.refreshRepoHub", () => repoHubProvider.refresh()),
+      vscode.commands.registerCommand("mtDevops.refreshRepoRadar", () => repoRadarProvider.refresh()),
     );
-    const repoHubWatcher = vscode.workspace.createFileSystemWatcher(path.join(cacheDir, ".vcs_hub.json"));
-    repoHubWatcher.onDidChange(() => repoHubProvider.refresh());
-    repoHubWatcher.onDidCreate(() => repoHubProvider.refresh());
-    repoHubWatcher.onDidDelete(() => repoHubProvider.refresh());
-    context.subscriptions.push(repoHubWatcher);
+    const repoRadarWatcher = vscode.workspace.createFileSystemWatcher(path.join(cacheDir, ".vcs_radar.json"));
+    repoRadarWatcher.onDidChange(() => repoRadarProvider.refresh());
+    repoRadarWatcher.onDidCreate(() => repoRadarProvider.refresh());
+    repoRadarWatcher.onDidDelete(() => repoRadarProvider.refresh());
+    context.subscriptions.push(repoRadarWatcher);
     context.subscriptions.push(
-      repoHubView.onDidChangeCheckboxState((e) => {
+      repoRadarView.onDidChangeCheckboxState((e) => {
         for (const [item, state] of e.items) {
           const checked = state === vscode.TreeItemCheckboxState.Checked;
           if (item instanceof BackgroundIndexingControlItem) {
-            void repoHubProvider.setBackgroundIndexing(checked);
+            void repoRadarProvider.setBackgroundIndexing(checked);
           } else if (item instanceof InfraOverviewControlItem) {
-            void repoHubProvider.setGenerateInfraOverview(checked);
+            void repoRadarProvider.setGenerateInfraOverview(checked);
           }
         }
       }),
@@ -644,7 +644,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // directly (no file to watch), so it needs its own refresh trigger for
     // whenever a folder is added to or removed from the workspace.
     context.subscriptions.push(
-      vscode.workspace.onDidChangeWorkspaceFolders(() => repoHubProvider.refresh()),
+      vscode.workspace.onDidChangeWorkspaceFolders(() => repoRadarProvider.refresh()),
     );
     // One toggle command rather than two contextValue-gated
     // Add/Remove-Favorite commands -- avoids having to also update every
@@ -652,14 +652,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // match, since favorited state here is just a visual (star prefix +
     // Favorites section membership), not a distinct item kind.
     context.subscriptions.push(
-      vscode.commands.registerCommand("mtDevops.toggleFavoriteRepo", (item: RepoTreeItem) => repoHubProvider.toggleFavorite(item.repoPath)),
+      vscode.commands.registerCommand("mtDevops.toggleFavoriteRepo", (item: RepoTreeItem) => repoRadarProvider.toggleFavorite(item.repoPath)),
     );
     // AI Provider Override row: a quick pick over the framework's own
     // fixed provider vocabulary (ai.default_provider's own valid values,
-    // per mt-hub's -p/--provider validation) plus a blank "Default" entry
+    // per mt-radar's -p/--provider validation) plus a blank "Default" entry
     // meaning no override.
     context.subscriptions.push(
-      vscode.commands.registerCommand("mtDevops.hubChangeProviderOverride", async () => {
+      vscode.commands.registerCommand("mtDevops.radarChangeProviderOverride", async () => {
         const options = [
           { label: "Default (config.yaml)", value: "" },
           { label: "gemini", value: "gemini" },
@@ -668,7 +668,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           { label: "local", value: "local" },
         ];
         const picked = await vscode.window.showQuickPick(options, { placeHolder: "Select an AI provider override for indexing" });
-        if (picked) await repoHubProvider.setProviderOverride(picked.value);
+        if (picked) await repoRadarProvider.setProviderOverride(picked.value);
       }),
     );
     // Standalone infra generation (the "repo's already indexed, I just
@@ -678,7 +678,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // captured toast, and needs no confirmation dialog either.
     context.subscriptions.push(
       vscode.commands.registerCommand("mtDevops.generateInfraOverview", (item: RepoTreeItem) =>
-        runInTerminal(`mt-hub --infra -r ${shellQuote(path.basename(item.repoPath))}`),
+        runInTerminal(`mt-radar --infra -r ${shellQuote(path.basename(item.repoPath))}`),
       ),
     );
     context.subscriptions.push(
@@ -687,7 +687,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     const configPath = path.join(configDir, "config.yaml");
 
-    // Repo Hub title-bar counterpart to the per-repo "Export for LLM"
+    // Repo Radar title-bar counterpart to the per-repo "Export for LLM"
     // action: not repo-scoped by construction (there's no item to
     // right-click at the view's title bar), so this reuses pickRepoPath's
     // own "resolve from context, else fall back to whichever repos are
@@ -744,7 +744,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
 
     context.subscriptions.push(
-      // Repo Hub context-menu entry point: the item already carries its
+      // Repo Radar context-menu entry point: the item already carries its
       // own repoPath, no resolution needed.
       vscode.commands.registerCommand("mtDevops.openExportWizard", (item: RepoTreeItem) => openExportWizardFor(item.repoPath)),
       // Command-palette/Explorer entry point: same repo-resolution
