@@ -8,7 +8,7 @@ interface InfraResourceEntry {
   name: string;
 }
 
-/** From __mt_radar_gcp_check_resource (.bash.d/20-vcs/58-infra-gcp-scan.sh) -- one Terraform google_* resource's live-deployment check. "reason" is set only when deployed is false: "unsupported-resource-type" (supported is also false in that case), "api-error", or "not-found-or-no-access". */
+/** From __mt_radar_gcp_check_resource (.bash.d/20-vcs/58-infra-gcp-scan.sh) -- one Terraform google_* resource's live-deployment check. "reason" is set only when deployed is false: "unsupported-resource-type" (supported is also false in that case), "api-error", or "not-found-or-no-access". "matched_name" is set only when deployed is true via the repo-name fallback rather than an exact match on the Terraform resource label ("name") -- real deployments overwhelmingly name a resource after the repo (`name = var.service_name`) rather than its Terraform label. */
 interface GcpScanResource {
   type: string;
   name: string;
@@ -17,6 +17,7 @@ interface GcpScanResource {
   region: string | null;
   console_url: string | null;
   live_url: string | null;
+  matched_name: string | null;
   reason: string | null;
 }
 
@@ -90,7 +91,7 @@ function buildNotAnalyzedHtml(repoName: string, noTerraform: boolean): string {
   return /* html */ `<p>${message}</p>${button}`;
 }
 
-/** Renders __mt_radar_gcp_scan_repo's result -- an existence check ("does a resource with this Terraform label's name exist in the given project"), not a real terraform plan config/state drift check, called out explicitly here so the RAG badge isn't read as more authoritative than it is. Unsupported resource types (nothing to check yet, e.g. Pub/Sub) are listed separately from not-deployed ones so a false-red repo full of unsupported types doesn't look identical to one that's actually missing everything. */
+/** Renders __mt_radar_gcp_scan_repo's result -- an existence check ("does a resource with this Terraform label's name, or failing that the repo's own name, exist in the given project"), not a real terraform plan config/state drift check, called out explicitly here so the RAG badge isn't read as more authoritative than it is. Unsupported resource types (nothing to check yet, e.g. Pub/Sub) are listed separately from not-deployed ones so a false-red repo full of unsupported types doesn't look identical to one that's actually missing everything. */
 function buildGcpScanHtml(scan: GcpScan | undefined): string {
   if (!scan) {
     return /* html */ `
@@ -108,7 +109,8 @@ function buildGcpScanHtml(scan: GcpScan | undefined): string {
       if (r.deployed) {
         const link = r.console_url ? ` -- <a href="${escapeHtml(r.console_url)}">Console</a>` : "";
         const live = r.live_url ? ` <a href="${escapeHtml(r.live_url)}">↗</a>` : "";
-        return `<li>✅ ${label}${link}${live}</li>`;
+        const matched = r.matched_name ? ` <span class="dim">(deployed as "${escapeHtml(r.matched_name)}", not the Terraform label)</span>` : "";
+        return `<li>✅ ${label}${matched}${link}${live}</li>`;
       }
       const reason = r.reason && r.reason !== "not-found-or-no-access" ? ` <span class="dim">(${escapeHtml(r.reason)})</span>` : "";
       return `<li>❌ ${label} <span class="dim">-- not found in ${escapeHtml(scan.project)}</span>${reason}</li>`;
