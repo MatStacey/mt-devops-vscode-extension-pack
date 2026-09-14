@@ -60,6 +60,21 @@ interface DependencyAuditResult {
   vulnerabilities: Record<string, number> | null;
 }
 
+interface DependencyUpdate {
+  /** "dependency" | "property" | "parent" | "plugin" -- see __mt_parse_maven_version_updates; npm/pip updates are always "dependency". */
+  scope: string;
+  artifact: string;
+  current: string;
+  latest: string;
+}
+
+interface DependencyOutdatedResult {
+  status: "ok" | "unsupported" | "tool-missing" | "error";
+  tool: string | null;
+  message: string | null;
+  updates: DependencyUpdate[] | null;
+}
+
 const AI_UPDATE_KINDS = {
   readme: { command: "mt-ai-readme", label: "README" },
   gitignore: { command: "mt-ai-gitignore", label: ".gitignore" },
@@ -468,20 +483,46 @@ function buildGithubHtml(github: GithubStatus | null, webUrl: string | undefined
   return `<h2>GitHub</h2><div>${prLine}${ciLine}</div>`;
 }
 
-/** Renders mt-audit-deps --json's result for injection into #depsResult -- every interpolated value is either a fixed literal or passed through escapeHtml first. */
+/** Renders mt-audit-deps --json's result for injection into #depsAuditResult -- every interpolated value is either a fixed literal or passed through escapeHtml first. */
 function buildDependencyAuditHtml(result: DependencyAuditResult): string {
   if (result.status === "ok" && result.vulnerabilities) {
     const total = result.vulnerabilities.total ?? 0;
     if (total === 0) {
-      return `<div class="staleWarning" style="background:transparent;border-color:var(--vscode-panel-border);">✅ ${escapeHtml(result.tool ?? "")}: no known vulnerabilities.</div>`;
+      return `<h2>Vulnerabilities</h2><div class="staleWarning" style="background:transparent;border-color:var(--vscode-panel-border);">✅ ${escapeHtml(result.tool ?? "")}: no known vulnerabilities.</div>`;
     }
     const counts = Object.entries(result.vulnerabilities)
       .filter(([key, value]) => key !== "total" && typeof value === "number" && value > 0)
       .map(([key, value]) => `${escapeHtml(key)}: ${value}`)
       .join(", ");
-    return `<div class="staleWarning">⚠️ ${escapeHtml(result.tool ?? "")}: ${total} vulnerabilit${total === 1 ? "y" : "ies"}${counts ? ` (${counts})` : ""}.</div>`;
+    return `<h2>Vulnerabilities</h2><div class="staleWarning">⚠️ ${escapeHtml(result.tool ?? "")}: ${total} vulnerabilit${total === 1 ? "y" : "ies"}${counts ? ` (${counts})` : ""}.</div>`;
   }
-  return `<div class="staleWarning">ℹ️ ${escapeHtml(result.message ?? "Dependency audit unavailable.")}</div>`;
+  return `<h2>Vulnerabilities</h2><div class="staleWarning">ℹ️ ${escapeHtml(result.message ?? "Dependency audit unavailable.")}</div>`;
+}
+
+/**
+ * Renders mt-deps-outdated --json's result for injection into
+ * #depsOutdatedResult -- the "recommendations" half of dependency
+ * checking, distinct from buildDependencyAuditHtml's vulnerability
+ * count: each row is a concrete "bump this" action, current version to
+ * latest, grouped by scope (a Maven parent-POM update is easy to miss by
+ * hand and surfaced the same way as a regular dependency here). Every
+ * interpolated value is passed through escapeHtml first.
+ */
+function buildDependencyOutdatedHtml(result: DependencyOutdatedResult): string {
+  if (result.status === "ok" && result.updates) {
+    if (result.updates.length === 0) {
+      return `<h2>Recommendations</h2><div class="staleWarning" style="background:transparent;border-color:var(--vscode-panel-border);">✅ ${escapeHtml(result.tool ?? "")}: everything is up to date.</div>`;
+    }
+    const rows = result.updates
+      .map(
+        (u) =>
+          `<tr><td class="label">${escapeHtml(u.scope)}</td><td><code>${escapeHtml(u.artifact)}</code></td><td>${escapeHtml(u.current)}</td><td class="dim">&rarr;</td><td>${escapeHtml(u.latest)}</td></tr>`,
+      )
+      .join("");
+    return `<h2>Recommendations</h2><table>${rows}</table>`;
+  }
+  if (result.status === "unsupported") return "";
+  return `<h2>Recommendations</h2><div class="staleWarning">ℹ️ ${escapeHtml(result.message ?? "Dependency update check unavailable.")}</div>`;
 }
 
 function buildCommitsHtml(commits: CommitEntry[], remote: RemoteInfo | null): string {
@@ -629,7 +670,8 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     ${data.hasHelmChart ? `<button id="viewHelmBtn">View in Helm Panel</button>` : ""}
   </div>
 
-  <div id="depsResult"></div>
+  <div id="depsAuditResult"></div>
+  <div id="depsOutdatedResult"></div>
 
   ${readmeSection}
 
@@ -665,20 +707,40 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
       vscode.postMessage({ command: "generateGitignore" });
     });
     const checkDepsBtn = document.getElementById("checkDepsBtn");
+    // Two independent results (vulnerabilities, recommendations) land as
+    // two separate postMessage calls -- mt-audit-deps's Maven branch can
+    // take minutes (builds a local CVE database on a cold cache) while
+    // mt-deps-outdated is always quick, so waiting for both before
+    // showing either would hold the fast, useful result hostage to the
+    // slow one. depsPending just tracks when both are back, to re-enable
+    // the button once, not to gate rendering either one.
+    let depsPending = 0;
     checkDepsBtn.addEventListener("click", () => {
       checkDepsBtn.disabled = true;
       checkDepsBtn.textContent = "Checking...";
+      document.getElementById("depsAuditResult").innerHTML = "";
+      document.getElementById("depsOutdatedResult").innerHTML = "";
+      depsPending = 2;
       vscode.postMessage({ command: "checkDependencies" });
     });
     window.addEventListener("message", (event) => {
-      if (event.data.command !== "dependencyAuditResult") return;
-      checkDepsBtn.disabled = false;
-      checkDepsBtn.textContent = "Check Dependencies";
       // Safe: event.data.html is built extension-side by
-      // buildDependencyAuditHtml, which escapeHtml()s every value it
-      // interpolates -- same trust boundary as the rest of this file's
-      // server-rendered HTML strings (buildGithubHtml, metaRow, ...).
-      document.getElementById("depsResult").innerHTML = event.data.html;
+      // buildDependencyAuditHtml/buildDependencyOutdatedHtml, which
+      // escapeHtml()s every value they interpolate -- same trust
+      // boundary as the rest of this file's server-rendered HTML strings
+      // (buildGithubHtml, metaRow, ...).
+      if (event.data.command === "dependencyAuditResult") {
+        document.getElementById("depsAuditResult").innerHTML = event.data.html;
+      } else if (event.data.command === "dependencyOutdatedResult") {
+        document.getElementById("depsOutdatedResult").innerHTML = event.data.html;
+      } else {
+        return;
+      }
+      depsPending = Math.max(0, depsPending - 1);
+      if (depsPending === 0) {
+        checkDepsBtn.disabled = false;
+        checkDepsBtn.textContent = "Check Dependencies";
+      }
     });
     document.getElementById("infraOverviewBtn").addEventListener("click", () => {
       vscode.postMessage({ command: "showInfraOverview" });
@@ -875,15 +937,48 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
         }
         if (message.command === "checkDependencies") {
           // Deliberately on-demand only, per plan -- a real audit hits a
-          // registry/database and can take several seconds, too slow to
+          // registry/database and can take several seconds (mt-audit-
+          // deps's Maven branch, minutes on a cold cache), too slow to
           // run automatically as part of collectReportData on every open.
-          let result: DependencyAuditResult;
-          try {
-            result = await runFrameworkJson<DependencyAuditResult>(`cd ${shellQuote(displayedRepoPath)} && mt-audit-deps --json`);
-          } catch (err) {
-            result = { status: "error", tool: null, message: err instanceof Error ? err.message : String(err), vulnerabilities: null };
-          }
-          activePanel?.webview.postMessage({ command: "dependencyAuditResult", html: buildDependencyAuditHtml(result) });
+          //
+          // The two checks run independently (fired together, awaited
+          // separately) rather than via Promise.all, so mt-deps-
+          // outdated's quick recommendations render immediately instead
+          // of waiting on mt-audit-deps's potentially much slower
+          // vulnerability scan. Each captures repoPath up front and
+          // re-checks it's still the displayed repo before posting --
+          // the panel is reused across repos, so a slow check finishing
+          // after the user has already clicked through to a different
+          // one must not paint stale results over it.
+          const repoPath = displayedRepoPath;
+
+          void runFrameworkJson<DependencyAuditResult>(`cd ${shellQuote(repoPath)} && mt-audit-deps --json`)
+            .catch(
+              (err): DependencyAuditResult => ({
+                status: "error",
+                tool: null,
+                message: err instanceof Error ? err.message : String(err),
+                vulnerabilities: null,
+              }),
+            )
+            .then((result) => {
+              if (repoPath !== displayedRepoPath) return;
+              activePanel?.webview.postMessage({ command: "dependencyAuditResult", html: buildDependencyAuditHtml(result) });
+            });
+
+          void runFrameworkJson<DependencyOutdatedResult>(`cd ${shellQuote(repoPath)} && mt-deps-outdated --json`)
+            .catch(
+              (err): DependencyOutdatedResult => ({
+                status: "error",
+                tool: null,
+                message: err instanceof Error ? err.message : String(err),
+                updates: null,
+              }),
+            )
+            .then((result) => {
+              if (repoPath !== displayedRepoPath) return;
+              activePanel?.webview.postMessage({ command: "dependencyOutdatedResult", html: buildDependencyOutdatedHtml(result) });
+            });
           return;
         }
         if (message.command === "showInfraOverview") {
