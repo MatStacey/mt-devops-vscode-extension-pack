@@ -446,7 +446,7 @@
   {
     "id": "mtDevops.catalog.ai_explain",
     "command": "ai-explain",
-    "description": "AI: Explain a terminal command in detail, grounding the explanation in",
+    "description": "AI: Explain a terminal command in detail, grounding the explanation in its",
     "category": "AI Workflows & LLM API Integration"
   },
   {
@@ -1002,9 +1002,21 @@
     "category": "Git: Bulk Repository Updates"
   },
   {
+    "id": "mtDevops.catalog.mt_audit_deps",
+    "command": "mt-audit-deps",
+    "description": "Repo: Run a dependency vulnerability audit for the current directory's",
+    "category": "Git: Dependency Vulnerability Audit"
+  },
+  {
+    "id": "mtDevops.catalog.mt_deps_outdated",
+    "command": "mt-deps-outdated",
+    "description": "Repo: Check whether the current directory's project has newer versions",
+    "category": "Git: Dependency Vulnerability Audit"
+  },
+  {
     "id": "mtDevops.catalog.google_fmt",
     "command": "google-fmt",
-    "description": "Formats Python and Shell scripts according to Google Style Guides.",
+    "description": "Formats Python, Shell, and Java source according to Google Style Guides.",
     "category": "Google Style Code Formatting"
   },
   {
@@ -1329,6 +1341,12 @@
     "id": "mtDevops.catalog.mt_add_gemini_key",
     "command": "mt-add-gemini-key",
     "description": "AI: Interactively add or update your Gemini API key",
+    "category": "Secrets Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_add_nvd_key",
+    "command": "mt-add-nvd-key",
+    "description": "Repo: Interactively add or update your NVD (National Vulnerability",
     "category": "Secrets Management"
   },
   {
