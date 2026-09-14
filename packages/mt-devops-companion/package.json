@@ -58,7 +58,7 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "mtDevops.refreshRepoHub",
+        "command": "mtDevops.refreshRepoRadar",
         "title": "Refresh",
         "icon": "$(refresh)"
       },
@@ -218,7 +218,7 @@
         "icon": "$(star-full)"
       },
       {
-        "command": "mtDevops.hubChangeProviderOverride",
+        "command": "mtDevops.radarChangeProviderOverride",
         "title": "Change AI Provider Override"
       },
       {
@@ -352,7 +352,7 @@
     "viewsWelcome": [
       {
         "view": "mtDevopsExportWizard",
-        "contents": "Right-click a repo in Repo Hub and choose \"Export Wizard (GUI)\", or run the command below on the current folder.\n[Open Export Wizard](command:mtDevops.openExportWizardFromExplorer)"
+        "contents": "Right-click a repo in Repo Radar and choose \"Export Wizard (GUI)\", or run the command below on the current folder.\n[Open Export Wizard](command:mtDevops.openExportWizardFromExplorer)"
       }
     ],
     "viewsContainers": {
@@ -371,8 +371,8 @@
           "name": "Jobs"
         },
         {
-          "id": "mtDevopsRepoHub",
-          "name": "Repo Hub"
+          "id": "mtDevopsRepoRadar",
+          "name": "Repo Radar"
         },
         {
           "id": "mtDevopsExportWizard",
@@ -504,8 +504,8 @@
           "group": "navigation"
         },
         {
-          "command": "mtDevops.refreshRepoHub",
-          "when": "view == mtDevopsRepoHub",
+          "command": "mtDevops.refreshRepoRadar",
+          "when": "view == mtDevopsRepoRadar",
           "group": "navigation"
         },
         {
@@ -580,27 +580,27 @@
         },
         {
           "command": "mtDevops.updateAllRepos",
-          "when": "view == mtDevopsRepoHub",
+          "when": "view == mtDevopsRepoRadar",
           "group": "navigation"
         },
         {
           "command": "mtDevops.indexAllRepos",
-          "when": "view == mtDevopsRepoHub",
+          "when": "view == mtDevopsRepoRadar",
           "group": "navigation"
         },
         {
           "command": "mtDevops.pullAllReposIfBehind",
-          "when": "view == mtDevopsRepoHub",
+          "when": "view == mtDevopsRepoRadar",
           "group": "navigation"
         },
         {
           "command": "mtDevops.createLlmExport",
-          "when": "view == mtDevopsRepoHub",
+          "when": "view == mtDevopsRepoRadar",
           "group": "navigation"
         },
         {
           "command": "mtDevops.viewExports",
-          "when": "view == mtDevopsRepoHub",
+          "when": "view == mtDevopsRepoRadar",
           "group": "navigation"
         },
         {
@@ -657,82 +657,82 @@
         },
         {
           "command": "mtDevops.openRepoInVSCode",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "1_open"
         },
         {
           "command": "mtDevops.indexRepo",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "2_index@1"
         },
         {
           "command": "mtDevops.updateRepo",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "2_index@2"
         },
         {
           "command": "mtDevops.pullRepoIfBehind",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "3_sync@1"
         },
         {
           "command": "mtDevops.pushAllChanges",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "3_sync@2"
         },
         {
           "command": "mtDevops.exportForLLM",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "3_sync@3"
         },
         {
           "command": "mtDevops.openExportWizard",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "3_sync@4"
         },
         {
           "command": "mtDevops.showInfraOverview",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "4_infra@1"
         },
         {
           "command": "mtDevops.generateInfraOverview",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "4_infra@2"
         },
         {
           "command": "mtDevops.toggleFavoriteRepo",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepo",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "1_open@2"
         },
         {
           "command": "mtDevops.indexCategory",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepoCategory",
           "group": "2_index@1"
         },
         {
           "command": "mtDevops.updateCategory",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepoCategory",
           "group": "2_index@2"
         },
         {
           "command": "mtDevops.pullCategoryIfBehind",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsRepoCategory",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepoCategory",
           "group": "3_sync@1"
         },
         {
           "command": "mtDevops.indexWorkspaceRepos",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsWorkspaceCategory",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsWorkspaceCategory",
           "group": "2_index@1"
         },
         {
           "command": "mtDevops.updateWorkspaceRepos",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsWorkspaceCategory",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsWorkspaceCategory",
           "group": "2_index@2"
         },
         {
           "command": "mtDevops.pullWorkspaceReposIfBehind",
-          "when": "view == mtDevopsRepoHub && viewItem == mtDevopsWorkspaceCategory",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsWorkspaceCategory",
           "group": "3_sync@1"
         },
         {

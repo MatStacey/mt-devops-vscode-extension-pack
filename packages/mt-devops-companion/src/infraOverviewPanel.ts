@@ -8,7 +8,7 @@ interface InfraResourceEntry {
   name: string;
 }
 
-/** From __mt_hub_gcp_check_resource (.bash.d/20-vcs/58-infra-gcp-scan.sh) -- one Terraform google_* resource's live-deployment check. "reason" is set only when deployed is false: "unsupported-resource-type" (supported is also false in that case), "api-error", or "not-found-or-no-access". */
+/** From __mt_radar_gcp_check_resource (.bash.d/20-vcs/58-infra-gcp-scan.sh) -- one Terraform google_* resource's live-deployment check. "reason" is set only when deployed is false: "unsupported-resource-type" (supported is also false in that case), "api-error", or "not-found-or-no-access". */
 interface GcpScanResource {
   type: string;
   name: string;
@@ -20,7 +20,7 @@ interface GcpScanResource {
   reason: string | null;
 }
 
-/** From __mt_hub_gcp_scan_repo -- an existence check against a live GCP project, not a `terraform plan` config/state drift check. sync_status: green = every checked resource deployed, red = none, amber = partial, unknown = nothing checkable (no google_* resources, or none of their types supported yet). */
+/** From __mt_radar_gcp_scan_repo -- an existence check against a live GCP project, not a `terraform plan` config/state drift check. sync_status: green = every checked resource deployed, red = none, amber = partial, unknown = nothing checkable (no google_* resources, or none of their types supported yet). */
 interface GcpScan {
   scanned_at: number;
   project: string;
@@ -42,7 +42,7 @@ interface InfraOverview {
   gcp_scan?: GcpScan;
 }
 
-/** Display order and colour per __mt_hub_infra_categorize_resource's category vocabulary (.bash.d/20-vcs/57-infra.sh) -- restricted to VS Code's standard chart tokens (no "charts-cyan" exists), reused where the palette runs out rather than falling back to a generic default for every remaining category. */
+/** Display order and colour per __mt_radar_infra_categorize_resource's category vocabulary (.bash.d/20-vcs/57-infra.sh) -- restricted to VS Code's standard chart tokens (no "charts-cyan" exists), reused where the palette runs out rather than falling back to a generic default for every remaining category. */
 const CATEGORY_ORDER = ["compute", "networking", "storage", "database", "messaging", "iam", "data", "other"] as const;
 const CATEGORY_LABEL: Record<string, string> = {
   compute: "Compute",
@@ -90,7 +90,7 @@ function buildNotAnalyzedHtml(repoName: string, noTerraform: boolean): string {
   return /* html */ `<p>${message}</p>${button}`;
 }
 
-/** Renders __mt_hub_gcp_scan_repo's result -- an existence check ("does a resource with this Terraform label's name exist in the given project"), not a real terraform plan config/state drift check, called out explicitly here so the RAG badge isn't read as more authoritative than it is. Unsupported resource types (nothing to check yet, e.g. Pub/Sub) are listed separately from not-deployed ones so a false-red repo full of unsupported types doesn't look identical to one that's actually missing everything. */
+/** Renders __mt_radar_gcp_scan_repo's result -- an existence check ("does a resource with this Terraform label's name exist in the given project"), not a real terraform plan config/state drift check, called out explicitly here so the RAG badge isn't read as more authoritative than it is. Unsupported resource types (nothing to check yet, e.g. Pub/Sub) are listed separately from not-deployed ones so a false-red repo full of unsupported types doesn't look identical to one that's actually missing everything. */
 function buildGcpScanHtml(scan: GcpScan | undefined): string {
   if (!scan) {
     return /* html */ `
@@ -247,12 +247,12 @@ let activePanel: vscode.WebviewPanel | undefined;
 let displayedRepoPath = "";
 
 async function fetchInfra(repoPath: string): Promise<InfraOverview> {
-  return runFrameworkJson<InfraOverview>(`mt-hub --show-infra ${shellQuote(repoPath)} --json`);
+  return runFrameworkJson<InfraOverview>(`mt-radar --show-infra ${shellQuote(repoPath)} --json`);
 }
 
 /**
- * Analyzes (mt-hub --infra -- no AI call, so no confirmation/cost warning
- * needed) then re-fetches the cached result. mt-hub --infra itself has no
+ * Analyzes (mt-radar --infra -- no AI call, so no confirmation/cost warning
+ * needed) then re-fetches the cached result. mt-radar --infra itself has no
  * --json mode (it's a bulk-capable scan with plain progress text, unlike
  * --show-infra's single-repo read), so this is two calls: one to generate,
  * one to read back the structured result -- if the second call still
@@ -262,11 +262,11 @@ async function fetchInfra(repoPath: string): Promise<InfraOverview> {
  */
 async function generateAndFetch(repoPath: string): Promise<InfraOverview> {
   // -r <name> alone is enough to target this exact repo, same as every
-  // other index/update command in this extension -- __mt_hub_infra_run
+  // other index/update command in this extension -- __mt_radar_infra_run
   // matches by basename against every repo under VCS_ROOT regardless of
   // which type/subfolder it lives in.
-  await runInteractiveShell(`mt-hub --infra -r ${shellQuote(path.basename(repoPath))}`).catch(() => {
-    // Ignore -- __mt_hub_infra_run's own progress text isn't JSON and
+  await runInteractiveShell(`mt-radar --infra -r ${shellQuote(path.basename(repoPath))}`).catch(() => {
+    // Ignore -- __mt_radar_infra_run's own progress text isn't JSON and
     // runInteractiveShell's marker-extraction can be finicky with it;
     // the follow-up fetchInfra call is the real source of truth here.
   });
@@ -274,14 +274,14 @@ async function generateAndFetch(repoPath: string): Promise<InfraOverview> {
 }
 
 /**
- * Runs mt-hub --scan-gcp (live, authenticated gcloud calls -- on-demand
+ * Runs mt-radar --scan-gcp (live, authenticated gcloud calls -- on-demand
  * only, same as generateAndFetch's --infra call has no AI cost but this
  * one does have live-API cost/latency) then re-fetches the merged
  * .vcs_infra.json entry, same two-call pattern as generateAndFetch.
  */
 async function scanGcpAndFetch(repoPath: string, gcpProject: string | undefined): Promise<InfraOverview> {
   const projectFlag = gcpProject ? ` --gcp-project ${shellQuote(gcpProject)}` : "";
-  await runInteractiveShell(`mt-hub --scan-gcp -r ${shellQuote(path.basename(repoPath))}${projectFlag}`);
+  await runInteractiveShell(`mt-radar --scan-gcp -r ${shellQuote(path.basename(repoPath))}${projectFlag}`);
   return fetchInfra(repoPath);
 }
 
@@ -289,7 +289,7 @@ async function scanGcpAndFetch(repoPath: string, gcpProject: string | undefined)
  * Shows the Terraform-derived infrastructure overview for one repo:
  * resources grouped by category (compute/networking/storage/database/
  * messaging/IAM/data/other), providers, and modules used -- generating
- * it on first view if it hasn't been already (mt-hub --infra has no AI
+ * it on first view if it hasn't been already (mt-radar --infra has no AI
  * cost, so this never needs the confirm-first treatment AI actions get).
  */
 export async function showInfraOverview(repoPath: string): Promise<void> {

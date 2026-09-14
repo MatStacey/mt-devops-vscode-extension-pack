@@ -6,10 +6,10 @@ import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
 import { openNewTerminalAt, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote } from "./framework";
 import { showInfraOverview } from "./infraOverviewPanel";
-import { getIndexModifierFlags } from "./repoHubProvider";
-import type { RepoMeta } from "./repoHubProvider";
+import { getIndexModifierFlags } from "./repoRadarProvider";
+import type { RepoMeta } from "./repoRadarProvider";
 
-/** Same badge-style palette as other status-coded pills elsewhere in this webview, keyed by mt-hub's AI-inferred environment "type" vocabulary. */
+/** Same badge-style palette as other status-coded pills elsewhere in this webview, keyed by mt-radar's AI-inferred environment "type" vocabulary. */
 const ENV_TYPE_COLOR: Record<string, string> = {
   dev: "var(--vscode-charts-blue)",
   staging: "var(--vscode-charts-yellow)",
@@ -113,7 +113,7 @@ function detectHelmChart(repoPath: string): boolean {
   return false;
 }
 
-/** Reads the 5 most recent commits via a plain, read-only `git log` -- not framework policy, just a local git query, same as __mt_hub_preview's own bash equivalent. */
+/** Reads the 5 most recent commits via a plain, read-only `git log` -- not framework policy, just a local git query, same as __mt_radar_preview's own bash equivalent. */
 function readRecentCommits(repoPath: string): Promise<CommitEntry[]> {
   return new Promise((resolve) => {
     execFile(
@@ -446,7 +446,7 @@ function buildEnvironmentsHtml(environments: RepoMeta["environments"]): string {
   return `<h2>Environments</h2><div class="environments">${pills}</div>`;
 }
 
-/** Renders __mt_hub_detect_gcp's result -- omitted entirely when nothing was detected, same as buildEnvironmentsHtml, rather than a "No GCP usage" line every non-GCP repo would otherwise show. "source" is surfaced only as a tooltip, not inline text, since "detected via Terraform" vs "detected via config files" matters far less than the fact/services themselves. */
+/** Renders __mt_radar_detect_gcp's result -- omitted entirely when nothing was detected, same as buildEnvironmentsHtml, rather than a "No GCP usage" line every non-GCP repo would otherwise show. "source" is surfaced only as a tooltip, not inline text, since "detected via Terraform" vs "detected via config files" matters far less than the fact/services themselves. */
 function buildGcpHtml(gcp: RepoMeta["gcp"]): string {
   if (!gcp || !gcp.detected) return "";
   const sourceLabel = gcp.source === "terraform" ? "Detected via Terraform" : "Detected via config files (app.yaml/cloudbuild.yaml/registry references)";
@@ -457,7 +457,7 @@ function buildGcpHtml(gcp: RepoMeta["gcp"]): string {
   return `<h2>Google Cloud Platform</h2><div class="environments" title="${escapeHtml(sourceLabel)}">${pills}</div>`;
 }
 
-/** Renders __mt_hub_detect_top_contributors's result -- omitted entirely when empty (no commits in the lookback window), same convention as buildEnvironmentsHtml/buildGcpHtml. Already ordered highest-commits-first by the framework, so no re-sorting here. */
+/** Renders __mt_radar_detect_top_contributors's result -- omitted entirely when empty (no commits in the lookback window), same convention as buildEnvironmentsHtml/buildGcpHtml. Already ordered highest-commits-first by the framework, so no re-sorting here. */
 function buildTopContributorsHtml(contributors: RepoMeta["top_contributors"]): string {
   if (!contributors || contributors.length === 0) return "";
   const rows = contributors
@@ -816,10 +816,10 @@ let activePanel: vscode.WebviewPanel | undefined;
 // button after viewing 3 repos would act on all 3.
 let displayedRepoPath = "";
 let displayedMeta: RepoMeta = {};
-// Set once from extension.ts (same context.globalState the Repo Hub tree's
+// Set once from extension.ts (same context.globalState the Repo Radar tree's
 // Background Indexing checkbox / AI Provider Override row write to) so the
 // report panel's own "Update Missing Index" button honors the same
-// sidebar-configured flags as every other mt-hub --index call site,
+// sidebar-configured flags as every other mt-radar --index call site,
 // without needing showRepoReport's own signature (and all its call sites)
 // to thread a Memento through just for this one button.
 let extensionState: vscode.Memento | undefined;
@@ -879,7 +879,7 @@ export async function runAiUpdateFlow(repoPath: string, kind: AiUpdateKind): Pro
 
 /**
  * Shows (or reuses, if already open) a single report panel for a repo's
- * cached mt-hub metadata plus its recent commit history, remote branch
+ * cached mt-radar metadata plus its recent commit history, remote branch
  * list, and rendered README. Reused across clicks rather than opening a
  * new tab per repo, matching how the extension already reuses one
  * terminal for framework commands.
@@ -908,12 +908,12 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
         }
         if (message.command === "updateIndex") {
           // Gap-fill indexing calls the AI provider and can take a while,
-          // and the Repo Hub tree already watches .vcs_hub.json and will
-          // refresh itself once mt-hub rewrites it -- same reasoning as
+          // and the Repo Radar tree already watches .vcs_radar.json and will
+          // refresh itself once mt-radar rewrites it -- same reasoning as
           // the equivalent right-click actions, so this runs visibly in
           // the terminal rather than captured.
           runInTerminal(
-            `mt-hub --index -u -r ${shellQuote(path.basename(displayedRepoPath))}${extensionState ? getIndexModifierFlags(extensionState) : ""}`,
+            `mt-radar --index -u -r ${shellQuote(path.basename(displayedRepoPath))}${extensionState ? getIndexModifierFlags(extensionState) : ""}`,
           );
           return;
         }

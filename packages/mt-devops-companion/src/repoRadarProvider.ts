@@ -8,14 +8,14 @@ export interface RepoEnvironment {
   type: string;
 }
 
-/** From __mt_hub_detect_gcp (.bash.d/20-vcs/53-vcs-insight.sh) -- "source" is "terraform" when a "google"/"google-beta" provider block or any google_* resource type was found (also the only source that ever populates "services", since resource-type prefixes are what map to a human-readable product name), "config-files" for the weaker app.yaml/cloudbuild.yaml/registry-reference fallback, "none" otherwise. */
+/** From __mt_radar_detect_gcp (.bash.d/20-vcs/53-vcs-insight.sh) -- "source" is "terraform" when a "google"/"google-beta" provider block or any google_* resource type was found (also the only source that ever populates "services", since resource-type prefixes are what map to a human-readable product name), "config-files" for the weaker app.yaml/cloudbuild.yaml/registry-reference fallback, "none" otherwise. */
 export interface RepoGcp {
   detected: boolean;
   source: "terraform" | "config-files" | "none";
   services: string[];
 }
 
-/** From __mt_hub_detect_top_contributors (.bash.d/20-vcs/53-vcs-insight.sh) -- top 5 authors on the repo's default branch within the configured lookback window (git.contributor_lookback_months, default 12 months), ordered highest-commits-first. last_commit is a Unix epoch (seconds). */
+/** From __mt_radar_detect_top_contributors (.bash.d/20-vcs/53-vcs-insight.sh) -- top 5 authors on the repo's default branch within the configured lookback window (git.contributor_lookback_months, default 12 months), ordered highest-commits-first. last_commit is a Unix epoch (seconds). */
 export interface RepoContributor {
   name: string;
   commits: number;
@@ -36,20 +36,20 @@ export interface RepoMeta {
 }
 
 /**
- * Reads `$CACHE_DIR/.vcs_hub.json`, the cache mt-hub already builds
+ * Reads `$CACHE_DIR/.vcs_radar.json`, the cache mt-radar already builds
  * (.bash.d/20-vcs/53-vcs-insight.sh) -- an object keyed by absolute
  * repo path, valued with AI/heuristic metadata about that repo.
  */
-function parseRepoHub(hubFilePath: string): Array<[string, RepoMeta]> {
-  if (!fs.existsSync(hubFilePath)) return [];
-  const raw = fs.readFileSync(hubFilePath, "utf8");
+function parseRepoRadar(radarFilePath: string): Array<[string, RepoMeta]> {
+  if (!fs.existsSync(radarFilePath)) return [];
+  const raw = fs.readFileSync(radarFilePath, "utf8");
   const data = JSON.parse(raw) as Record<string, RepoMeta>;
   return Object.entries(data).sort(([a], [b]) => path.basename(a).localeCompare(path.basename(b)));
 }
 
 /**
- * Derives a repo's grouping folder the same way __mt_hub_should_index /
- * mt-hub's own dashboard scan do (.bash.d/20-vcs/53-vcs-insight.sh): the
+ * Derives a repo's grouping folder the same way __mt_radar_should_index /
+ * mt-radar's own dashboard scan do (.bash.d/20-vcs/53-vcs-insight.sh): the
  * first path segment under VCS_ROOT, or "Root" for a repo sitting
  * directly in VCS_ROOT with no subfolder.
  */
@@ -110,10 +110,10 @@ export class RepoCategoryItem extends vscode.TreeItem {
 
 /**
  * The "Open in VS Code" section -- repos from the current workspace's
- * folders, not a real mt-hub -t/--type folder under VCS_ROOT, so it
+ * folders, not a real mt-radar -t/--type folder under VCS_ROOT, so it
  * gets its own contextValue rather than "mtDevopsRepoCategory": the
  * bulk "Index All in Category"/"Update All in Category" actions target
- * mt-hub's -t filter by name, which has no meaning for a synthetic
+ * mt-radar's -t filter by name, which has no meaning for a synthetic
  * grouping like this one, and would silently no-op (or worse, collide
  * with a real folder that happens to share this label).
  */
@@ -128,8 +128,8 @@ export class WorkspaceCategoryItem extends vscode.TreeItem {
 
 /**
  * A curated pinned-repos section at the top of the tree -- persisted in
- * extension globalState (see RepoHubProvider.toggleFavorite), not a real
- * mt-hub grouping, so like WorkspaceCategoryItem it gets its own
+ * extension globalState (see RepoRadarProvider.toggleFavorite), not a real
+ * mt-radar grouping, so like WorkspaceCategoryItem it gets its own
  * contextValue rather than "mtDevopsRepoCategory" (the bulk index/update
  * actions' -t filter has no meaning for it).
  */
@@ -143,12 +143,12 @@ export class FavoritesCategoryItem extends vscode.TreeItem {
 }
 
 /**
- * A real tree checkbox controlling whether every mt-hub --index call this
+ * A real tree checkbox controlling whether every mt-radar --index call this
  * provider's commands build runs with -b/--background -- ticked, indexing
  * detaches into a background job (tracked in the Jobs panel) instead of
  * streaming in the shared terminal, useful for a bulk "Index All Repos"
  * run the user doesn't want to sit and watch. Checkbox state changes are
- * delivered via the Repo Hub TreeView's own onDidChangeCheckboxState
+ * delivered via the Repo Radar TreeView's own onDidChangeCheckboxState
  * event (registered in extension.ts, since that event lives on the
  * TreeView object, not this provider) -- the same wiring pattern the
  * Export Wizard's file-exclude checkboxes use.
@@ -159,12 +159,12 @@ export class BackgroundIndexingControlItem extends vscode.TreeItem {
     this.checkboxState = enabled ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
     this.description = enabled ? "On -- runs as a background job" : "Off -- runs visibly in the terminal";
     this.iconPath = new vscode.ThemeIcon("run-all");
-    this.contextValue = "mtDevopsHubBackgroundToggle";
+    this.contextValue = "mtDevopsRadarBackgroundToggle";
   }
 }
 
 /**
- * Click-to-quick-pick row overriding mt-hub --index's AI provider for
+ * Click-to-quick-pick row overriding mt-radar --index's AI provider for
  * this session, the GUI equivalent of the CLI's own -p/--provider flag
  * (e.g. to save Claude usage by indexing with Gemini instead, without
  * touching the real ai.default_provider in config.yaml). Empty means no
@@ -176,13 +176,13 @@ export class ProviderOverrideControlItem extends vscode.TreeItem {
     super("AI Provider Override", vscode.TreeItemCollapsibleState.None);
     this.description = provider || "Default (config.yaml)";
     this.iconPath = new vscode.ThemeIcon("sparkle");
-    this.contextValue = "mtDevopsHubProviderOverride";
-    this.command = { command: "mtDevops.hubChangeProviderOverride", title: "Change AI Provider Override" };
+    this.contextValue = "mtDevopsRadarProviderOverride";
+    this.command = { command: "mtDevops.radarChangeProviderOverride", title: "Change AI Provider Override" };
   }
 }
 
 /**
- * A real tree checkbox controlling whether every mt-hub --index call this
+ * A real tree checkbox controlling whether every mt-radar --index call this
  * provider's commands build also runs --infra (see .bash.d/20-vcs/57-infra.sh)
  * right after each repo's normal indexing step -- generating a Terraform
  * infrastructure overview (resources by category, providers, modules) for
@@ -198,7 +198,7 @@ export class InfraOverviewControlItem extends vscode.TreeItem {
     this.checkboxState = enabled ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
     this.description = enabled ? "On -- runs --infra after indexing" : "Off";
     this.iconPath = new vscode.ThemeIcon("server-environment");
-    this.contextValue = "mtDevopsHubInfraToggle";
+    this.contextValue = "mtDevopsRadarInfraToggle";
   }
 }
 
@@ -227,7 +227,7 @@ class SummaryItem extends vscode.TreeItem {
 }
 
 /**
- * Same gap definition as the framework's own __mt_hub_load_existing_keys
+ * Same gap definition as the framework's own __mt_radar_load_existing_keys
  * (.bash.d/20-vcs/53-vcs-insight.sh) -- category/description never came
  * back from the AI, or the stack heuristic found nothing. Mirrored here
  * (not read from the framework) since it's a pure function of already-
@@ -278,7 +278,7 @@ function groupByCategory(entries: Array<[string, RepoMeta]>, vcsRoot: string): R
  * The current workspace's folders that are actually git repos --
  * `fs.existsSync(.../.git)` (not `-d`) so a worktree checkout (".git"
  * is a plain file there) still counts, same test as the framework's
- * own __mt_hub_find_repos. A plain non-repo directory added to the
+ * own __mt_radar_find_repos. A plain non-repo directory added to the
  * workspace (a scratch folder, a mounted data dir, ...) is
  * deliberately excluded -- this section is "repos I have open", not
  * "folders I have open".
@@ -302,13 +302,13 @@ const PROVIDER_OVERRIDE_STATE_KEY = "mtDevops.providerOverride";
 const INFRA_OVERVIEW_STATE_KEY = "mtDevops.generateInfraOverview";
 
 /**
- * Builds the extra mt-hub --index flags implied by the sidebar's
+ * Builds the extra mt-radar --index flags implied by the sidebar's
  * Background Indexing / Generate Infra Overview checkboxes and the AI
  * Provider Override row -- appended verbatim to every index/update
  * command built anywhere in extension.ts (context menus, title-bar
  * buttons, and the Explorer counterparts, some of which are registered
- * before RepoHubProvider itself exists). Reads the same globalState keys
- * RepoHubProvider's own instance methods use, so it's a free function
+ * before RepoRadarProvider itself exists). Reads the same globalState keys
+ * RepoRadarProvider's own instance methods use, so it's a free function
  * rather than a provider method -- a shared store, not state owned by
  * one object. Provider values only ever come from the fixed quick-pick
  * list in extension.ts (gemini/claude/claude-code/local), never
@@ -323,12 +323,12 @@ export function getIndexModifierFlags(state: vscode.Memento): string {
   return parts.length > 0 ? ` ${parts.join(" ")}` : "";
 }
 
-export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+export class RepoRadarProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   constructor(
-    private readonly hubFilePath: string,
+    private readonly radarFilePath: string,
     private readonly vcsRoot: string,
     private readonly state: vscode.Memento,
   ) {}
@@ -398,7 +398,7 @@ export class RepoHubProvider implements vscode.TreeDataProvider<vscode.TreeItem>
       return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, false, this.isFavorite(repoPath)));
     }
     try {
-      const cacheEntries = parseRepoHub(this.hubFilePath);
+      const cacheEntries = parseRepoRadar(this.radarFilePath);
       const openRepos = findOpenWorkspaceRepos(cacheEntries);
       const workspaceSection = openRepos.length > 0 ? [new WorkspaceCategoryItem(openRepos)] : [];
 
