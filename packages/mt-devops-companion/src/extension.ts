@@ -671,6 +671,62 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (picked) await repoRadarProvider.setProviderOverride(picked.value);
       }),
     );
+    // Search Repos row: a plain input box pre-filled with the current term
+    // -- submitting empty clears it. Escaping the box (undefined, not "")
+    // leaves the existing search term untouched.
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.radarSearch", async () => {
+        const term = await vscode.window.showInputBox({
+          title: "Search Repo Radar",
+          prompt: "Filter repos by name, description, category or stack",
+          value: repoRadarProvider.getSearchTerm(),
+          placeHolder: "e.g. terraform, gcp, cloudconnect",
+        });
+        if (term !== undefined) repoRadarProvider.setSearchTerm(term);
+      }),
+    );
+    // Filters row: a multi-select quick pick over the categories/stacks
+    // actually present in the current radar cache plus the two static
+    // toggles -- unchecking everything clears the filter, same as an
+    // empty search term.
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.radarFilter", async () => {
+        const current = repoRadarProvider.getFilters();
+        // `facet` (not `kind`) to avoid colliding with QuickPickItem's own
+        // `kind`, which is reserved for marking separator rows.
+        type FilterQuickPickItem = vscode.QuickPickItem & { facet?: "category" | "stack" | "needsIndex" | "gcpOnly"; value?: string };
+        const separator = (label: string): FilterQuickPickItem => ({ label, kind: vscode.QuickPickItemKind.Separator });
+        const items: FilterQuickPickItem[] = [
+          { label: "Needs Indexing", facet: "needsIndex", picked: current.needsIndex },
+          { label: "GCP Detected", facet: "gcpOnly", picked: current.gcpOnly },
+          separator("Category"),
+          ...repoRadarProvider.getAvailableCategories().map((category) => ({
+            label: category,
+            facet: "category" as const,
+            value: category,
+            picked: current.categories.includes(category),
+          })),
+          separator("Stack"),
+          ...repoRadarProvider.getAvailableStacks().map((stack) => ({
+            label: stack,
+            facet: "stack" as const,
+            value: stack,
+            picked: current.stacks.includes(stack),
+          })),
+        ];
+        const picked = await vscode.window.showQuickPick(items, {
+          canPickMany: true,
+          placeHolder: "Select filters to narrow Repo Radar (none = show everything)",
+        });
+        if (!picked) return;
+        await repoRadarProvider.setFilters({
+          categories: picked.filter((item) => item.facet === "category").map((item) => item.value!),
+          stacks: picked.filter((item) => item.facet === "stack").map((item) => item.value!),
+          needsIndex: picked.some((item) => item.facet === "needsIndex"),
+          gcpOnly: picked.some((item) => item.facet === "gcpOnly"),
+        });
+      }),
+    );
     // Standalone infra generation (the "repo's already indexed, I just
     // want this one thing" case from the Generate Infra Overview
     // checkbox's own doc comment) -- no AI call, so this runs visibly in
