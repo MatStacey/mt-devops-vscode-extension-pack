@@ -267,6 +267,16 @@
         "icon": "$(cloud-download)"
       },
       {
+        "command": "mtDevops.radarSearch",
+        "title": "Search Repos",
+        "icon": "$(search)"
+      },
+      {
+        "command": "mtDevops.radarFilter",
+        "title": "Filter Repos",
+        "icon": "$(filter)"
+      },
+      {
         "command": "mtDevops.exportCleanup",
         "title": "MT DevOps: Cleanup LLM Exports"
       },
@@ -590,6 +600,16 @@
         },
         {
           "command": "mtDevops.pullAllReposIfBehind",
+          "when": "view == mtDevopsRepoRadar",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.radarSearch",
+          "when": "view == mtDevopsRepoRadar",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.radarFilter",
           "when": "view == mtDevopsRepoRadar",
           "group": "navigation"
         },

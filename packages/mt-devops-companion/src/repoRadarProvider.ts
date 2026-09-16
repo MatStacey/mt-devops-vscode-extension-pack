@@ -202,6 +202,40 @@ export class InfraOverviewControlItem extends vscode.TreeItem {
   }
 }
 
+/**
+ * Click-to-input-box row filtering the tree to repos whose name,
+ * description, category or stack contains the given text
+ * (case-insensitive substring match). Applied ahead of every other
+ * section (Favorites, Open in VS Code, categories) so a search narrows
+ * the whole tree consistently. Empty term means no filtering.
+ */
+export class SearchControlItem extends vscode.TreeItem {
+  constructor(term: string) {
+    super("Search Repos", vscode.TreeItemCollapsibleState.None);
+    this.description = term || "(none)";
+    this.iconPath = new vscode.ThemeIcon("search");
+    this.contextValue = "mtDevopsRadarSearch";
+    this.command = { command: "mtDevops.radarSearch", title: "Search Repos" };
+  }
+}
+
+/**
+ * Click-to-quick-pick row narrowing the tree by category/stack (OR'd
+ * within each facet, AND'd across facets) plus the "Needs Indexing" and
+ * "GCP Detected" toggles -- same AND-across/OR-within convention as most
+ * faceted filters. No "Favorites Only" facet here since the Favorites
+ * section already exists for that.
+ */
+export class FilterControlItem extends vscode.TreeItem {
+  constructor(summary: string) {
+    super("Filters", vscode.TreeItemCollapsibleState.None);
+    this.description = summary || "(none)";
+    this.iconPath = new vscode.ThemeIcon("filter");
+    this.contextValue = "mtDevopsRadarFilter";
+    this.command = { command: "mtDevops.radarFilter", title: "Filter Repos" };
+  }
+}
+
 class RepoErrorItem extends vscode.TreeItem {
   constructor(message: string) {
     super(message, vscode.TreeItemCollapsibleState.None);
@@ -242,6 +276,42 @@ function hasIndexGap(meta: RepoMeta): boolean {
     !meta.stack ||
     meta.stack === "Unknown"
   );
+}
+
+export interface RadarFilters {
+  categories: string[];
+  stacks: string[];
+  needsIndex: boolean;
+  gcpOnly: boolean;
+}
+
+const EMPTY_FILTERS: RadarFilters = { categories: [], stacks: [], needsIndex: false, gcpOnly: false };
+
+/** Case-insensitive substring match against name, description, category and stack -- an empty term always matches. */
+function matchesSearch(repoPath: string, meta: RepoMeta, term: string): boolean {
+  if (!term) return true;
+  const needle = term.toLowerCase();
+  const haystacks = [path.basename(repoPath), meta.description, meta.category, meta.stack];
+  return haystacks.some((field) => field?.toLowerCase().includes(needle));
+}
+
+/** Categories/stacks OR within their own facet, every non-empty facet AND'd together. */
+function matchesFilters(repoPath: string, meta: RepoMeta, filters: RadarFilters, vcsRoot: string): boolean {
+  if (filters.categories.length > 0 && !filters.categories.includes(repoCategory(repoPath, vcsRoot))) return false;
+  if (filters.stacks.length > 0 && (!meta.stack || !filters.stacks.includes(meta.stack))) return false;
+  if (filters.needsIndex && !hasIndexGap(meta)) return false;
+  if (filters.gcpOnly && !meta.gcp?.detected) return false;
+  return true;
+}
+
+/** Short "Category: Personal · Needs Indexing" style label for FilterControlItem's description -- empty when no filter is active. */
+function summarizeFilters(filters: RadarFilters): string {
+  const parts: string[] = [];
+  if (filters.categories.length > 0) parts.push(`Category: ${filters.categories.join(", ")}`);
+  if (filters.stacks.length > 0) parts.push(`Stack: ${filters.stacks.join(", ")}`);
+  if (filters.needsIndex) parts.push("Needs Indexing");
+  if (filters.gcpOnly) parts.push("GCP Detected");
+  return parts.join(" · ");
 }
 
 /** Whether a repo has uncommitted changes -- resolves false (not an error) if git itself fails, e.g. a repo mid-rebase or otherwise transiently unreadable. */
@@ -327,11 +397,48 @@ export class RepoRadarProvider implements vscode.TreeDataProvider<vscode.TreeIte
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
+  // Search/filter are per-session view state, not read by anything outside
+  // this provider (unlike the globalState-backed toggles above, which
+  // getIndexModifierFlags also needs), so plain instance fields are enough
+  // -- they reset when the window reloads, same as a typical filter box.
+  private searchTerm = "";
+  private filters: RadarFilters = EMPTY_FILTERS;
+
   constructor(
     private readonly radarFilePath: string,
     private readonly vcsRoot: string,
     private readonly state: vscode.Memento,
   ) {}
+
+  getSearchTerm(): string {
+    return this.searchTerm;
+  }
+
+  setSearchTerm(term: string): void {
+    this.searchTerm = term.trim();
+    this.refresh();
+  }
+
+  getFilters(): RadarFilters {
+    return this.filters;
+  }
+
+  setFilters(filters: RadarFilters): void {
+    this.filters = filters;
+    this.refresh();
+  }
+
+  /** Distinct, sorted category values from the current radar cache, for the filter quick-pick. */
+  getAvailableCategories(): string[] {
+    const entries = parseRepoRadar(this.radarFilePath);
+    return [...new Set(entries.map(([repoPath]) => repoCategory(repoPath, this.vcsRoot)))].sort();
+  }
+
+  /** Distinct, sorted stack values from the current radar cache, for the filter quick-pick. */
+  getAvailableStacks(): string[] {
+    const entries = parseRepoRadar(this.radarFilePath);
+    return [...new Set(entries.map(([, meta]) => meta.stack).filter((stack): stack is string => Boolean(stack)))].sort();
+  }
 
   private getFavoritePaths(): string[] {
     return this.state.get(FAVORITES_STATE_KEY, []);
@@ -399,31 +506,44 @@ export class RepoRadarProvider implements vscode.TreeDataProvider<vscode.TreeIte
     }
     try {
       const cacheEntries = parseRepoRadar(this.radarFilePath);
-      const openRepos = findOpenWorkspaceRepos(cacheEntries);
+      // Summary counts stay against the full, unfiltered cache -- it's the
+      // "state of the whole radar" line, not a count of what search/filter
+      // happen to be narrowing the tree down to right now.
+      const needsIndex = cacheEntries.filter(([, meta]) => hasIndexGap(meta)).length;
+
+      const matchesSearchAndFilters = ([repoPath, meta]: [string, RepoMeta]) =>
+        matchesSearch(repoPath, meta, this.searchTerm) && matchesFilters(repoPath, meta, this.filters, this.vcsRoot);
+      const visibleEntries = cacheEntries.filter(matchesSearchAndFilters);
+
+      const openRepos = findOpenWorkspaceRepos(cacheEntries).filter(matchesSearchAndFilters);
       const workspaceSection = openRepos.length > 0 ? [new WorkspaceCategoryItem(openRepos)] : [];
 
       const metaByPath = new Map([...cacheEntries, ...openRepos]);
       const favoriteEntries: Array<[string, RepoMeta]> = this.getFavoritePaths()
         .filter((repoPath) => metaByPath.has(repoPath))
-        .map((repoPath) => [repoPath, metaByPath.get(repoPath)!]);
+        .map((repoPath): [string, RepoMeta] => [repoPath, metaByPath.get(repoPath)!])
+        .filter(matchesSearchAndFilters);
       const favoritesSection = favoriteEntries.length > 0 ? [new FavoritesCategoryItem(favoriteEntries)] : [];
 
-      const needsIndex = cacheEntries.filter(([, meta]) => hasIndexGap(meta)).length;
       const openDirtyFlags = await Promise.all(openRepos.map(([repoPath]) => isDirty(repoPath)));
       const dirtyCount = openDirtyFlags.filter(Boolean).length;
       const summary = new SummaryItem(cacheEntries.length, needsIndex, dirtyCount);
       const backgroundItem = new BackgroundIndexingControlItem(this.getBackgroundIndexing());
       const providerItem = new ProviderOverrideControlItem(this.getProviderOverride());
       const infraItem = new InfraOverviewControlItem(this.getGenerateInfraOverview());
+      const searchItem = new SearchControlItem(this.searchTerm);
+      const filterItem = new FilterControlItem(summarizeFilters(this.filters));
 
       return [
         backgroundItem,
         providerItem,
         infraItem,
+        searchItem,
+        filterItem,
         summary,
         ...favoritesSection,
         ...workspaceSection,
-        ...groupByCategory(cacheEntries, this.vcsRoot),
+        ...groupByCategory(visibleEntries, this.vcsRoot),
       ];
     } catch (err) {
       return [new RepoErrorItem(err instanceof Error ? err.message : String(err))];
