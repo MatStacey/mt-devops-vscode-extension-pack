@@ -656,7 +656,7 @@
   {
     "id": "mtDevops.catalog.mt_wizard_docker",
     "command": "mt-wizard-docker",
-    "description": "Config: Interactive Docker Configuration Wizard -- restart blocklist",
+    "description": "Config: Interactive Docker Configuration Wizard -- restart blocklist,",
     "category": "Configuration Management"
   },
   {
