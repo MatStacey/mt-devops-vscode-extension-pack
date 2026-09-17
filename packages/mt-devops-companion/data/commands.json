@@ -656,7 +656,7 @@
   {
     "id": "mtDevops.catalog.mt_wizard_docker",
     "command": "mt-wizard-docker",
-    "description": "Config: Interactive Docker Configuration Wizard -- restart blocklist",
+    "description": "Config: Interactive Docker Configuration Wizard -- restart blocklist,",
     "category": "Configuration Management"
   },
   {
@@ -756,6 +756,12 @@
     "category": "Container Orchestration (Kubernetes) Tools"
   },
   {
+    "id": "mtDevops.catalog.docker_compose_inspect",
+    "command": "docker-compose-inspect",
+    "description": "Docker: List each Compose service's container_name, restart policy,",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
     "id": "mtDevops.catalog.docker_containers",
     "command": "docker-containers",
     "description": "Docker: Interactive container management console -- fzf-pick any",
@@ -768,9 +774,21 @@
     "category": "Docker: Container Management Utilities"
   },
   {
+    "id": "mtDevops.catalog.docker_group_start",
+    "command": "docker-group-start",
+    "description": "Docker: Start every container in a single Compose project -- 'docker",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_group_stop",
+    "command": "docker-group-stop",
+    "description": "Docker: Stop every container in a single Compose project in place --",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
     "id": "mtDevops.catalog.docker_ls",
     "command": "docker-ls",
-    "description": "Docker: List all running containers in a clean table format",
+    "description": "Docker: List containers in a clean table format",
     "category": "Docker: Container Management Utilities"
   },
   {
@@ -801,6 +819,18 @@
     "id": "mtDevops.catalog.docker_shell",
     "command": "docker-shell",
     "description": "Docker: Interactive fuzzy-finder to exec into a running container",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_start_all",
+    "command": "docker-start-all",
+    "description": "Docker: Start every known Docker Compose project on this host,",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_stop_all",
+    "command": "docker-stop-all",
+    "description": "Docker: Stop every running Docker Compose project on this host in",
     "category": "Docker: Container Management Utilities"
   },
   {
@@ -1578,6 +1608,12 @@
     "category": "Version Control (Git) - Core Helpers"
   },
   {
+    "id": "mtDevops.catalog.git_review_start",
+    "command": "git-review-start",
+    "description": "Git: Quick orientation for starting a code review -- current branch",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
     "id": "mtDevops.catalog.git_view_remote",
     "command": "git-view-remote",
     "description": "Git: Open current repository remote URL in default web browser",
@@ -1593,6 +1629,12 @@
     "id": "mtDevops.catalog.mt_repos",
     "command": "mt-repos",
     "description": "Git: Scan VCS root and list all local repositories, optionally",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.mt_repos_run",
+    "command": "mt-repos-run",
+    "description": "Git: Run a git subcommand across every repo matching mt-repos' own",
     "category": "Version Control (Git) - Core Helpers"
   },
   {
@@ -1618,6 +1660,24 @@
     "command": "mt-push-update",
     "description": "System: Sync local bash configs to terminal dotfiles repo and create a Pull Request",
     "category": "Version Control (Git) - Profile Synchronization"
+  },
+  {
+    "id": "mtDevops.catalog.git_remote_diff",
+    "command": "git-remote-diff",
+    "description": "Git: Diff two refs -- typically two remote-tracking branches -- without",
+    "category": "Version Control (Git) - Remote-Ref Inspection"
+  },
+  {
+    "id": "mtDevops.catalog.git_remote_grep",
+    "command": "git-remote-grep",
+    "description": "Git: Count pattern matches across one or more refs without checking",
+    "category": "Version Control (Git) - Remote-Ref Inspection"
+  },
+  {
+    "id": "mtDevops.catalog.git_remote_show",
+    "command": "git-remote-show",
+    "description": "Git: Show a file's content as of a specific ref without checking that",
+    "category": "Version Control (Git) - Remote-Ref Inspection"
   },
   {
     "id": "mtDevops.catalog.mt_suggest",
