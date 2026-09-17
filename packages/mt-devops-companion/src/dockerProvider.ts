@@ -66,7 +66,25 @@ export class DockerRepoGroupItem extends vscode.TreeItem {
     super(repo, vscode.TreeItemCollapsibleState.Expanded);
     this.description = `${containers.length} container${containers.length === 1 ? "" : "s"}`;
     this.iconPath = new vscode.ThemeIcon(repo === UNGROUPED_LABEL ? "folder" : "repo");
-    this.contextValue = "mtDevopsDockerRepoGroup";
+    // "Ungrouped" containers aren't a real Compose project (see
+    // dockerComposeRepo's own doc comment) -- there's no docker-reboot/
+    // docker-group-stop/docker-group-start target for the group as a
+    // whole, so it gets its own contextValue and package.json's group
+    // actions only ever match "mtDevopsDockerRepoGroup".
+    this.contextValue = repo === UNGROUPED_LABEL ? "mtDevopsDockerUngroupedGroup" : "mtDevopsDockerRepoGroup";
+  }
+
+  /**
+   * A real container name from this group to pass as docker-reboot/
+   * docker-group-stop/docker-group-start's <container|project> target --
+   * more reliable than this.repo (derived from the working_dir label's
+   * directory name), which isn't guaranteed to match Compose's actual
+   * project name (a compose.yml `name:` override, or Compose's own
+   * lowercasing/dash-stripping, can make the two diverge). Any container
+   * in the group resolves to the same project, so the first is enough.
+   */
+  get resolveTarget(): string | undefined {
+    return this.containers[0]?.Names;
   }
 }
 
@@ -78,6 +96,7 @@ class DockerErrorItem extends vscode.TreeItem {
 }
 
 const GROUP_BY_REPO_STATE_KEY = "mtDevops.dockerGroupByRepo";
+const SHOW_STOPPED_STATE_KEY = "mtDevops.dockerShowStopped";
 
 /**
  * Groups containers by their Compose project's repo directory, sorted
@@ -115,6 +134,15 @@ export class DockerProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
     this.refresh();
   }
 
+  get showStopped(): boolean {
+    return this.state.get(SHOW_STOPPED_STATE_KEY, false);
+  }
+
+  async toggleShowStopped(): Promise<void> {
+    await this.state.update(SHOW_STOPPED_STATE_KEY, !this.showStopped);
+    this.refresh();
+  }
+
   refresh(): void {
     this._onDidChangeTreeData.fire();
   }
@@ -128,7 +156,7 @@ export class DockerProvider implements vscode.TreeDataProvider<vscode.TreeItem> 
       return element.containers.map((container) => new DockerContainerItem(container));
     }
     try {
-      const containers = await runFrameworkJson<DockerContainer[]>("docker-ls --json");
+      const containers = await runFrameworkJson<DockerContainer[]>(`docker-ls --json${this.showStopped ? " --all" : ""}`);
       if (this.groupByRepo) return groupByRepo(containers);
       return containers
         .sort((a, b) => a.Names.localeCompare(b.Names))

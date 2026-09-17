@@ -4,7 +4,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { registerAiChatParticipant } from "./aiChatParticipant";
 import { DoctorProvider } from "./doctorProvider";
-import { DockerContainerItem, DockerProvider } from "./dockerProvider";
+import { DockerContainerItem, DockerProvider, DockerRepoGroupItem } from "./dockerProvider";
 import { ExportWizardProvider, WizardFileItem } from "./exportWizardProvider";
 import { showExportPlan } from "./exportPlanPanel";
 import { resolveFrameworkPaths, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote, stripAnsi } from "./framework";
@@ -297,6 +297,55 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       runInTerminal(`__docker_container_shell ${shellQuote(item.containerName)}`),
     ),
 
+    // Docker: Compose-project-level actions from a repo group's context
+    // menu -- docker-reboot/docker-group-stop/docker-group-start (all in
+    // 30-docker.sh) rather than the per-container __docker_container_*
+    // helpers above, since these recreate/stop/start the whole project
+    // (shared networks/volumes, startup ordering) instead of bouncing one
+    // container in isolation. item.resolveTarget is a real container name
+    // from the group, not item.repo -- see DockerRepoGroupItem's own doc
+    // comment for why that's the reliable one to resolve a project from.
+    vscode.commands.registerCommand("mtDevops.dockerRestartGroup", (item: DockerRepoGroupItem) => {
+      if (item.resolveTarget) runInTerminal(`docker-reboot ${shellQuote(item.resolveTarget)}`);
+    }),
+    vscode.commands.registerCommand("mtDevops.dockerStopGroup", (item: DockerRepoGroupItem) => {
+      if (item.resolveTarget) runInTerminal(`docker-group-stop ${shellQuote(item.resolveTarget)}`);
+    }),
+    vscode.commands.registerCommand("mtDevops.dockerStartGroup", (item: DockerRepoGroupItem) => {
+      if (item.resolveTarget) runInTerminal(`docker-group-start ${shellQuote(item.resolveTarget)}`);
+    }),
+
+    // Docker: host-wide bulk actions -- each queues one background job
+    // per Compose project (docker-reboot-all/docker-stop-all/
+    // docker-start-all in 30-docker.sh), same confirm-first treatment as
+    // Repo Radar's own whole-VCS_ROOT actions (indexAllRepos,
+    // pullAllReposIfBehind) since this touches every project on the host
+    // rather than one the user picked.
+    vscode.commands.registerCommand("mtDevops.dockerRestartAll", async () => {
+      const choice = await vscode.window.showWarningMessage(
+        "Restart every running Docker Compose project on this host? Each project is recreated (down + up), not just bounced.",
+        { modal: true },
+        "Restart All",
+      );
+      if (choice === "Restart All") runInTerminal("docker-reboot-all");
+    }),
+    vscode.commands.registerCommand("mtDevops.dockerStopAll", async () => {
+      const choice = await vscode.window.showWarningMessage(
+        "Stop every running Docker Compose project on this host?",
+        { modal: true },
+        "Stop All",
+      );
+      if (choice === "Stop All") runInTerminal("docker-stop-all");
+    }),
+    vscode.commands.registerCommand("mtDevops.dockerStartAll", async () => {
+      const choice = await vscode.window.showWarningMessage(
+        "Start every known Docker Compose project on this host, including ones that are fully stopped?",
+        { modal: true },
+        "Start All",
+      );
+      if (choice === "Start All") runInTerminal("docker-start-all");
+    }),
+
     // Helm: uninstall runs in a visible terminal, not captured -- unlike
     // Jobs/Secrets' fast one-shot actions, helm-uninstall's own
     // __k8s_confirm_destructive guard needs a real /dev/tty (and adds a
@@ -570,6 +619,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerAsyncView(context, "mtDevopsDocker", dockerProvider, "mtDevops.refreshDocker");
   context.subscriptions.push(
     vscode.commands.registerCommand("mtDevops.toggleDockerGroupByRepo", () => dockerProvider.toggleGroupByRepo()),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("mtDevops.toggleDockerShowStopped", () => dockerProvider.toggleShowStopped()),
   );
   registerAsyncView(context, "mtDevopsKubernetes", new KubernetesProvider(), "mtDevops.refreshKubernetes");
   registerAsyncView(context, "mtDevopsHelm", new HelmProvider(), "mtDevops.refreshHelm");
