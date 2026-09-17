@@ -163,6 +163,41 @@
         "icon": "$(terminal)"
       },
       {
+        "command": "mtDevops.dockerRestartGroup",
+        "title": "Restart Group",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mtDevops.dockerStopGroup",
+        "title": "Stop Group",
+        "icon": "$(stop-circle)"
+      },
+      {
+        "command": "mtDevops.dockerStartGroup",
+        "title": "Start Group",
+        "icon": "$(play)"
+      },
+      {
+        "command": "mtDevops.dockerRestartAll",
+        "title": "Restart All Projects",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "mtDevops.dockerStopAll",
+        "title": "Stop All Projects",
+        "icon": "$(stop-circle)"
+      },
+      {
+        "command": "mtDevops.dockerStartAll",
+        "title": "Start All Projects",
+        "icon": "$(play)"
+      },
+      {
+        "command": "mtDevops.toggleDockerShowStopped",
+        "title": "Toggle Show Stopped Containers",
+        "icon": "$(eye)"
+      },
+      {
         "command": "mtDevops.jobRestart",
         "title": "Re-run Job",
         "icon": "$(debug-rerun)"
@@ -569,6 +604,26 @@
           "group": "navigation"
         },
         {
+          "command": "mtDevops.toggleDockerShowStopped",
+          "when": "view == mtDevopsDocker",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.dockerStartAll",
+          "when": "view == mtDevopsDocker",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.dockerStopAll",
+          "when": "view == mtDevopsDocker",
+          "group": "navigation"
+        },
+        {
+          "command": "mtDevops.dockerRestartAll",
+          "when": "view == mtDevopsDocker",
+          "group": "navigation"
+        },
+        {
           "command": "mtDevops.refreshKubernetes",
           "when": "view == mtDevopsKubernetes",
           "group": "navigation"
@@ -648,6 +703,21 @@
         {
           "command": "mtDevops.dockerRestart",
           "when": "view == mtDevopsDocker && viewItem == mtDevopsContainer-running",
+          "group": "1_lifecycle@3"
+        },
+        {
+          "command": "mtDevops.dockerStartGroup",
+          "when": "view == mtDevopsDocker && viewItem == mtDevopsDockerRepoGroup",
+          "group": "1_lifecycle@1"
+        },
+        {
+          "command": "mtDevops.dockerStopGroup",
+          "when": "view == mtDevopsDocker && viewItem == mtDevopsDockerRepoGroup",
+          "group": "1_lifecycle@2"
+        },
+        {
+          "command": "mtDevops.dockerRestartGroup",
+          "when": "view == mtDevopsDocker && viewItem == mtDevopsDockerRepoGroup",
           "group": "1_lifecycle@3"
         },
         {
