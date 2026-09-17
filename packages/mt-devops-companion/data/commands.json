@@ -656,7 +656,7 @@
   {
     "id": "mtDevops.catalog.mt_wizard_docker",
     "command": "mt-wizard-docker",
-    "description": "Config: Interactive Docker Configuration Wizard -- restart blocklist",
+    "description": "Config: Interactive Docker Configuration Wizard -- restart blocklist,",
     "category": "Configuration Management"
   },
   {
@@ -768,9 +768,21 @@
     "category": "Docker: Container Management Utilities"
   },
   {
+    "id": "mtDevops.catalog.docker_group_start",
+    "command": "docker-group-start",
+    "description": "Docker: Start every container in a single Compose project -- 'docker",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_group_stop",
+    "command": "docker-group-stop",
+    "description": "Docker: Stop every container in a single Compose project in place --",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
     "id": "mtDevops.catalog.docker_ls",
     "command": "docker-ls",
-    "description": "Docker: List all running containers in a clean table format",
+    "description": "Docker: List containers in a clean table format",
     "category": "Docker: Container Management Utilities"
   },
   {
@@ -801,6 +813,18 @@
     "id": "mtDevops.catalog.docker_shell",
     "command": "docker-shell",
     "description": "Docker: Interactive fuzzy-finder to exec into a running container",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_start_all",
+    "command": "docker-start-all",
+    "description": "Docker: Start every known Docker Compose project on this host,",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_stop_all",
+    "command": "docker-stop-all",
+    "description": "Docker: Stop every running Docker Compose project on this host in",
     "category": "Docker: Container Management Utilities"
   },
   {
