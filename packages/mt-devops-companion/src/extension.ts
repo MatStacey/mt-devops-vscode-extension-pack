@@ -19,6 +19,7 @@ import { MinikubeProvider } from "./minikubeProvider";
 import {
   BackgroundIndexingControlItem,
   getIndexModifierFlags,
+  GroupByStatusControlItem,
   InfraOverviewControlItem,
   RepoCategoryItem,
   RepoRadarProvider,
@@ -689,6 +690,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             void repoRadarProvider.setBackgroundIndexing(checked);
           } else if (item instanceof InfraOverviewControlItem) {
             void repoRadarProvider.setGenerateInfraOverview(checked);
+          } else if (item instanceof GroupByStatusControlItem) {
+            void repoRadarProvider.setGroupByStatus(checked);
           }
         }
       }),

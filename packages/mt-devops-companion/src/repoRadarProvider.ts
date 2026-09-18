@@ -68,10 +68,17 @@ export class RepoTreeItem extends vscode.TreeItem {
     favorited = false,
   ) {
     super(`${favorited ? "⭐ " : ""}${path.basename(repoPath)}`, vscode.TreeItemCollapsibleState.None);
-    this.description = [meta.stack || meta.category || "", dirty ? "●" : ""].filter(Boolean).join("  ");
+    const needsIndex = hasIndexGap(meta);
+    // Dirty (uncommitted local work) takes icon-color priority over needs-
+    // indexing (a stale/missing AI metadata gap) -- both are surfaced
+    // either way via the description glyphs and tooltip below, this only
+    // decides which one gets the single ThemeIcon color VS Code allows.
+    this.description = [meta.stack || meta.category || "", needsIndex ? "⚠" : "", dirty ? "●" : ""].filter(Boolean).join("  ");
     this.iconPath = dirty
       ? new vscode.ThemeIcon("repo", new vscode.ThemeColor("gitDecoration.modifiedResourceForeground"))
-      : new vscode.ThemeIcon("repo");
+      : needsIndex
+        ? new vscode.ThemeIcon("repo", new vscode.ThemeColor("problemsWarningIcon.foreground"))
+        : new vscode.ThemeIcon("repo");
     this.tooltip = new vscode.MarkdownString(
       `**${repoPath}**\n\n` +
         `${meta.description || "No description available."}\n\n` +
@@ -80,6 +87,7 @@ export class RepoTreeItem extends vscode.TreeItem {
         `- Build: ${meta.build ?? "None"}\n` +
         `- CI/CD: ${meta.cicd ?? "None"}\n` +
         `- Testing: ${meta.testing ?? "None"}` +
+        (needsIndex ? `\n\n⚠️ Needs (re)indexing -- category/description/stack metadata is incomplete` : "") +
         (dirty ? `\n\n⚠️ Has uncommitted changes` : ""),
     );
     this.contextValue = "mtDevopsRepo";
@@ -203,6 +211,76 @@ export class InfraOverviewControlItem extends vscode.TreeItem {
 }
 
 /**
+ * A real tree checkbox controlling whether each of the "personal"/"work"/
+ * "Open in VS Code" sections is split into Dirty/Needs Indexing/Indexed
+ * subgroups (see RepoStatusGroupItem) instead of listing repos flat. Off
+ * by default -- most repo lists are short enough that the extra nesting
+ * level isn't worth it until a user actually asks for it.
+ */
+export class GroupByStatusControlItem extends vscode.TreeItem {
+  constructor(enabled: boolean) {
+    super("Group by Status", vscode.TreeItemCollapsibleState.None);
+    this.checkboxState = enabled ? vscode.TreeItemCheckboxState.Checked : vscode.TreeItemCheckboxState.Unchecked;
+    this.description = enabled ? "On -- splits each group into Dirty/Needs Indexing/Indexed" : "Off";
+    this.iconPath = new vscode.ThemeIcon("list-tree");
+    this.contextValue = "mtDevopsRadarGroupByStatusToggle";
+  }
+}
+
+/**
+ * Collapsed-by-default container for the sidebar's non-repo settings
+ * (Background Indexing, AI Provider Override, Generate Infra Overview,
+ * Group by Status) -- tucks them out of the way now that they're their
+ * own section rather than four always-visible rows above every repo.
+ */
+export class OptionsSectionItem extends vscode.TreeItem {
+  constructor() {
+    super("Options", vscode.TreeItemCollapsibleState.Collapsed);
+    this.iconPath = new vscode.ThemeIcon("settings-gear");
+    this.contextValue = "mtDevopsRadarOptionsSection";
+  }
+}
+
+/**
+ * Collapsed-by-default container for the sidebar's Search/Filters rows,
+ * separate from OptionsSectionItem since these narrow what's shown rather
+ * than change how indexing behaves.
+ */
+export class SearchSectionItem extends vscode.TreeItem {
+  constructor() {
+    super("Search", vscode.TreeItemCollapsibleState.Collapsed);
+    this.iconPath = new vscode.ThemeIcon("search");
+    this.contextValue = "mtDevopsRadarSearchSection";
+  }
+}
+
+/** The three buckets a repo can fall into for GroupByStatusControlItem's subgrouping -- see repoStatusBucket for the (mutually exclusive) assignment rule. */
+type RepoStatusBucket = "dirty" | "needs-index" | "indexed";
+
+const STATUS_BUCKET_LABEL: Record<RepoStatusBucket, string> = { dirty: "Dirty", "needs-index": "Needs Indexing", indexed: "Indexed" };
+const STATUS_BUCKET_ICON: Record<RepoStatusBucket, string> = { dirty: "diff-modified", "needs-index": "warning", indexed: "check" };
+
+/**
+ * A "Dirty"/"Needs Indexing"/"Indexed" subgroup under a category or the
+ * "Open in VS Code" section, shown only when GroupByStatusControlItem is
+ * checked. Carries the already-computed dirty flags (from
+ * RepoRadarProvider's per-refresh dirtyCache) alongside its repos so
+ * expanding it doesn't need another round of git status calls.
+ */
+export class RepoStatusGroupItem extends vscode.TreeItem {
+  constructor(
+    public readonly bucket: RepoStatusBucket,
+    public readonly repos: Array<[string, RepoMeta]>,
+    public readonly dirtyByPath: Map<string, boolean>,
+  ) {
+    super(STATUS_BUCKET_LABEL[bucket], vscode.TreeItemCollapsibleState.Collapsed);
+    this.description = `${repos.length} repo${repos.length === 1 ? "" : "s"}`;
+    this.iconPath = new vscode.ThemeIcon(STATUS_BUCKET_ICON[bucket]);
+    this.contextValue = "mtDevopsRepoStatusGroup";
+  }
+}
+
+/**
  * Click-to-input-box row filtering the tree to repos whose name,
  * description, category or stack contains the given text
  * (case-insensitive substring match). Applied ahead of every other
@@ -276,6 +354,21 @@ function hasIndexGap(meta: RepoMeta): boolean {
     !meta.stack ||
     meta.stack === "Unknown"
   );
+}
+
+/**
+ * Assigns a repo to exactly one of GroupByStatusControlItem's three
+ * subgroups. Dirty (uncommitted local work) wins over a metadata gap --
+ * it's the more urgent, more transient fact -- so a repo that's both
+ * dirty and never fully indexed lands under "Dirty", not "Needs
+ * Indexing". This is a partition (every repo lands in exactly one
+ * bucket), unlike RepoTreeItem's own display, which shows both facts
+ * independently regardless of this ordering.
+ */
+function repoStatusBucket(meta: RepoMeta, dirty: boolean): RepoStatusBucket {
+  if (dirty) return "dirty";
+  if (hasIndexGap(meta)) return "needs-index";
+  return "indexed";
 }
 
 export interface RadarFilters {
@@ -370,6 +463,7 @@ const FAVORITES_STATE_KEY = "mtDevops.favoriteRepoPaths";
 const BACKGROUND_INDEXING_STATE_KEY = "mtDevops.backgroundIndexing";
 const PROVIDER_OVERRIDE_STATE_KEY = "mtDevops.providerOverride";
 const INFRA_OVERVIEW_STATE_KEY = "mtDevops.generateInfraOverview";
+const GROUP_BY_STATUS_STATE_KEY = "mtDevops.groupByStatus";
 
 /**
  * Builds the extra mt-radar --index flags implied by the sidebar's
@@ -403,6 +497,16 @@ export class RepoRadarProvider implements vscode.TreeDataProvider<vscode.TreeIte
   // -- they reset when the window reloads, same as a typical filter box.
   private searchTerm = "";
   private filters: RadarFilters = EMPTY_FILTERS;
+
+  // Populated once per root getChildren() call (a `git status --porcelain`
+  // per cached repo, run in parallel) and read synchronously by every
+  // subsequent getChildren(element) call for the same tree refresh --
+  // VS Code always resolves a TreeDataProvider's root before any of its
+  // children, so this is never read before it's populated. Kept on the
+  // instance (not returned from getChildren itself) since RepoStatusGroupItem
+  // and the plain category/workspace branches all need the same map,
+  // without paying for another round of git calls per expansion.
+  private dirtyCache = new Map<string, boolean>();
 
   constructor(
     private readonly radarFilePath: string,
@@ -464,6 +568,15 @@ export class RepoRadarProvider implements vscode.TreeDataProvider<vscode.TreeIte
     this.refresh();
   }
 
+  getGroupByStatus(): boolean {
+    return this.state.get(GROUP_BY_STATUS_STATE_KEY, false);
+  }
+
+  async setGroupByStatus(value: boolean): Promise<void> {
+    await this.state.update(GROUP_BY_STATUS_STATE_KEY, value);
+    this.refresh();
+  }
+
   getProviderOverride(): string {
     return this.state.get(PROVIDER_OVERRIDE_STATE_KEY, "");
   }
@@ -490,19 +603,46 @@ export class RepoRadarProvider implements vscode.TreeDataProvider<vscode.TreeIte
     return element;
   }
 
-  async getChildren(element?: RepoCategoryItem | WorkspaceCategoryItem | FavoritesCategoryItem): Promise<vscode.TreeItem[]> {
+  /** Splits repos into RepoStatusGroupItem buckets using the already-populated dirtyCache -- shared by the category and workspace-section branches of getChildren. */
+  private buildStatusGroups(repos: Array<[string, RepoMeta]>): RepoStatusGroupItem[] {
+    const buckets: Record<RepoStatusBucket, Array<[string, RepoMeta]>> = { dirty: [], "needs-index": [], indexed: [] };
+    for (const entry of repos) {
+      buckets[repoStatusBucket(entry[1], this.dirtyCache.get(entry[0]) ?? false)].push(entry);
+    }
+    const order: RepoStatusBucket[] = ["dirty", "needs-index", "indexed"];
+    return order.filter((bucket) => buckets[bucket].length > 0).map((bucket) => new RepoStatusGroupItem(bucket, buckets[bucket], this.dirtyCache));
+  }
+
+  async getChildren(
+    element?: RepoCategoryItem | WorkspaceCategoryItem | FavoritesCategoryItem | OptionsSectionItem | SearchSectionItem | RepoStatusGroupItem,
+  ): Promise<vscode.TreeItem[]> {
+    if (element instanceof OptionsSectionItem) {
+      return [
+        new BackgroundIndexingControlItem(this.getBackgroundIndexing()),
+        new ProviderOverrideControlItem(this.getProviderOverride()),
+        new InfraOverviewControlItem(this.getGenerateInfraOverview()),
+        new GroupByStatusControlItem(this.getGroupByStatus()),
+      ];
+    }
+    if (element instanceof SearchSectionItem) {
+      return [new SearchControlItem(this.searchTerm), new FilterControlItem(summarizeFilters(this.filters))];
+    }
+    if (element instanceof RepoStatusGroupItem) {
+      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, element.dirtyByPath.get(repoPath) ?? false, this.isFavorite(repoPath)));
+    }
     if (element instanceof WorkspaceCategoryItem) {
-      // Only ever a handful of repos (whatever's actually open), so a
-      // live `git status` per repo here is cheap -- doing the same for
-      // every repo in the full category tree below would not be.
-      const dirtyFlags = await Promise.all(element.repos.map(([repoPath]) => isDirty(repoPath)));
-      return element.repos.map(([repoPath, meta], i) => new RepoTreeItem(repoPath, meta, dirtyFlags[i], this.isFavorite(repoPath)));
+      // dirtyCache is already populated from this same tree refresh's root
+      // getChildren() call below -- see its field comment for why that
+      // ordering is guaranteed rather than assumed.
+      if (this.getGroupByStatus()) return this.buildStatusGroups(element.repos);
+      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, this.dirtyCache.get(repoPath) ?? false, this.isFavorite(repoPath)));
     }
     if (element instanceof FavoritesCategoryItem) {
-      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, false, true));
+      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, this.dirtyCache.get(repoPath) ?? false, true));
     }
     if (element) {
-      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, false, this.isFavorite(repoPath)));
+      if (this.getGroupByStatus()) return this.buildStatusGroups(element.repos);
+      return element.repos.map(([repoPath, meta]) => new RepoTreeItem(repoPath, meta, this.dirtyCache.get(repoPath) ?? false, this.isFavorite(repoPath)));
     }
     try {
       const cacheEntries = parseRepoRadar(this.radarFilePath);
@@ -525,22 +665,24 @@ export class RepoRadarProvider implements vscode.TreeDataProvider<vscode.TreeIte
         .filter(matchesSearchAndFilters);
       const favoritesSection = favoriteEntries.length > 0 ? [new FavoritesCategoryItem(favoriteEntries)] : [];
 
-      const openDirtyFlags = await Promise.all(openRepos.map(([repoPath]) => isDirty(repoPath)));
-      const dirtyCount = openDirtyFlags.filter(Boolean).length;
+      // One `git status --porcelain` per known repo (cached + open, deduped),
+      // run in parallel -- ~100 short-lived child processes is well within
+      // what a sidebar refresh can afford, and this is the one place the
+      // whole tree's dirty state is computed; every branch above reads the
+      // result back out of dirtyCache rather than re-running git itself.
+      const allPaths = [...metaByPath.keys()];
+      const dirtyFlags = await Promise.all(allPaths.map((repoPath) => isDirty(repoPath)));
+      this.dirtyCache = new Map(allPaths.map((repoPath, i) => [repoPath, dirtyFlags[i]]));
+      const dirtyCount = dirtyFlags.filter(Boolean).length;
+
       const summary = new SummaryItem(cacheEntries.length, needsIndex, dirtyCount);
-      const backgroundItem = new BackgroundIndexingControlItem(this.getBackgroundIndexing());
-      const providerItem = new ProviderOverrideControlItem(this.getProviderOverride());
-      const infraItem = new InfraOverviewControlItem(this.getGenerateInfraOverview());
-      const searchItem = new SearchControlItem(this.searchTerm);
-      const filterItem = new FilterControlItem(summarizeFilters(this.filters));
+      const optionsSection = new OptionsSectionItem();
+      const searchSection = new SearchSectionItem();
 
       return [
-        backgroundItem,
-        providerItem,
-        infraItem,
-        searchItem,
-        filterItem,
         summary,
+        optionsSection,
+        searchSection,
         ...favoritesSection,
         ...workspaceSection,
         ...groupByCategory(visibleEntries, this.vcsRoot),
