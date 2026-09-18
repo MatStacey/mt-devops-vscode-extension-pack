@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { marked, Renderer } from "marked";
 import * as vscode from "vscode";
 import { openNewTerminalAt, runFrameworkJson, runInteractiveShell, runInTerminal, shellQuote } from "./framework";
+import { showIamAdvisor } from "./iamAdvisorPanel";
 import { showInfraOverview } from "./infraOverviewPanel";
 import { getIndexModifierFlags } from "./repoRadarProvider";
 import type { RepoMeta } from "./repoRadarProvider";
@@ -371,14 +372,23 @@ safeRenderer.image = ({ href, title, text }) => {
   return `<img src="${escapeHtml(safeHref)}" alt="${escapeHtml(text)}"${titleAttr}>`;
 };
 
+/**
+ * Renders raw markdown through the same XSS-safe renderer as the README
+ * view (raw HTML passthrough escaped, link/image URLs scheme-restricted) --
+ * exported so other webviews rendering AI-generated markdown (e.g. the IAM
+ * advisor's analysis text) share this one hardened renderer rather than
+ * each maintaining their own copy of the same security-sensitive logic.
+ */
+export async function renderMarkdownSafe(raw: string): Promise<string> {
+  return marked.parse(raw, { renderer: safeRenderer });
+}
+
 async function renderReadme(repoPath: string): Promise<string | null> {
   const readmePath = findReadme(repoPath);
   if (!readmePath) return null;
   try {
     const raw = await fs.promises.readFile(readmePath, "utf8");
-    return path.extname(readmePath).toLowerCase() === ".txt"
-      ? `<pre>${escapeHtml(raw)}</pre>`
-      : await marked.parse(raw, { renderer: safeRenderer });
+    return path.extname(readmePath).toLowerCase() === ".txt" ? `<pre>${escapeHtml(raw)}</pre>` : await renderMarkdownSafe(raw);
   } catch {
     return null;
   }
@@ -666,6 +676,7 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     <button id="generateGitignoreBtn">Generate/Update .gitignore</button>
     <button id="checkDepsBtn">Check Dependencies</button>
     <button id="infraOverviewBtn">Infrastructure Overview</button>
+    <button id="iamAdvisorBtn">IAM Recommendations</button>
     ${data.hasDockerCompose ? `<button id="viewDockerBtn">View in Docker Panel</button>` : ""}
     ${data.hasHelmChart ? `<button id="viewHelmBtn">View in Helm Panel</button>` : ""}
   </div>
@@ -744,6 +755,9 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
     });
     document.getElementById("infraOverviewBtn").addEventListener("click", () => {
       vscode.postMessage({ command: "showInfraOverview" });
+    });
+    document.getElementById("iamAdvisorBtn").addEventListener("click", () => {
+      vscode.postMessage({ command: "showIamAdvisor" });
     });
     document.getElementById("pathRow").addEventListener("click", () => {
       vscode.postMessage({ command: "openNewTerminal" });
@@ -983,6 +997,10 @@ export async function showRepoReport(repoPath: string, meta: RepoMeta): Promise<
         }
         if (message.command === "showInfraOverview") {
           await showInfraOverview(displayedRepoPath);
+          return;
+        }
+        if (message.command === "showIamAdvisor") {
+          await showIamAdvisor(displayedRepoPath);
           return;
         }
         // Each view contribution gets a VS Code-generated "<viewId>.focus"

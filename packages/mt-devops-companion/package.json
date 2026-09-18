@@ -340,6 +340,11 @@
         "icon": "$(server-environment)"
       },
       {
+        "command": "mtDevops.showIamAdvisor",
+        "title": "Show IAM Recommendations",
+        "icon": "$(key)"
+      },
+      {
         "command": "mtDevops.wizardChangeSchema",
         "title": "Change Export Schema"
       },
@@ -789,6 +794,11 @@
           "command": "mtDevops.generateInfraOverview",
           "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
           "group": "4_infra@2"
+        },
+        {
+          "command": "mtDevops.showIamAdvisor",
+          "when": "view == mtDevopsRepoRadar && viewItem == mtDevopsRepo",
+          "group": "4_infra@3"
         },
         {
           "command": "mtDevops.toggleFavoriteRepo",

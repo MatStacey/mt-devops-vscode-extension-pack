@@ -11,6 +11,7 @@ import { resolveFrameworkPaths, runFrameworkJson, runInteractiveShell, runInTerm
 import { JobsProvider, JobTreeItem } from "./jobsProvider";
 import { HelmProvider, HelmReleaseItem } from "./helmProvider";
 import { HistoryEntryItem, HistoryProvider } from "./historyProvider";
+import { showIamAdvisor } from "./iamAdvisorPanel";
 import { showInfraOverview } from "./infraOverviewPanel";
 import { KubernetesProvider } from "./kubernetesProvider";
 import { LogProvider } from "./logProvider";
@@ -791,6 +792,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     context.subscriptions.push(
       vscode.commands.registerCommand("mtDevops.showInfraOverview", (item: RepoTreeItem) => showInfraOverview(item.repoPath)),
+    );
+    context.subscriptions.push(
+      vscode.commands.registerCommand("mtDevops.showIamAdvisor", (item: RepoTreeItem) => showIamAdvisor(item.repoPath)),
     );
 
     const configPath = path.join(configDir, "config.yaml");
