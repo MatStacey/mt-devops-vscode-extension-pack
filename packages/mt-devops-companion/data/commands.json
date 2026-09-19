@@ -666,6 +666,12 @@
     "category": "Configuration Management"
   },
   {
+    "id": "mtDevops.catalog.mt_wizard_gcp",
+    "command": "mt-wizard-gcp",
+    "description": "Config: Interactive GCP Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
     "id": "mtDevops.catalog.mt_wizard_git",
     "command": "mt-wizard-git",
     "description": "Config: Interactive Git Setup Menu",
