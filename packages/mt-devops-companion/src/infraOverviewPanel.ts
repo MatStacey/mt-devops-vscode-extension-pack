@@ -13,6 +13,8 @@ interface InfraResourceEntry {
 interface GcpScanResource {
   type: string;
   name: string;
+  /** Infrastructure-overview category (CATEGORY_ORDER); null for unsupported types. Absent in scans cached before grouping existed. */
+  group?: string | null;
   supported: boolean;
   deployed: boolean;
   region: string | null;
@@ -103,20 +105,27 @@ function buildGcpScanHtml(scan: GcpScan | undefined): string {
   const icon = SYNC_STATUS_ICON[scan.sync_status];
   const scannedAt = new Date(scan.scanned_at * 1000).toLocaleString();
 
-  const rows = scan.resources
-    .filter((r) => r.supported)
-    .map((r) => {
-      const label = `${escapeHtml(r.type)}<span class="dim">.${escapeHtml(r.name)}</span>`;
-      if (r.deployed) {
-        const link = r.console_url ? ` -- <a href="${escapeHtml(r.console_url)}">Console</a>` : "";
-        const live = r.live_url ? ` <a href="${escapeHtml(r.live_url)}">↗</a>` : "";
-        const matched = r.matched_name ? ` <span class="dim">(deployed as "${escapeHtml(r.matched_name)}", not the Terraform label)</span>` : "";
-        return `<li>✅ ${label}${matched}${link}${live}</li>`;
-      }
-      const reason = r.reason && r.reason !== "not-found-or-no-access" ? ` <span class="dim">(${escapeHtml(r.reason)})</span>` : "";
-      return `<li>❌ ${label} <span class="dim">-- not found in ${escapeHtml(scan.project)}</span>${reason}</li>`;
-    })
-    .join("");
+  const renderRow = (r: GcpScanResource): string => {
+    const label = `${escapeHtml(r.type)}<span class="dim">.${escapeHtml(r.name)}</span>`;
+    if (r.deployed) {
+      const link = r.console_url ? ` -- <a href="${escapeHtml(r.console_url)}">Console</a>` : "";
+      const live = r.live_url ? ` <a href="${escapeHtml(r.live_url)}">↗</a>` : "";
+      const matched = r.matched_name ? ` <span class="dim">(deployed as "${escapeHtml(r.matched_name)}", not the Terraform label)</span>` : "";
+      return `<li>✅ ${label}${matched}${link}${live}</li>`;
+    }
+    const reason = r.reason && r.reason !== "not-found-or-no-access" ? ` <span class="dim">(${escapeHtml(r.reason)})</span>` : "";
+    return `<li>❌ ${label} <span class="dim">-- not found in ${escapeHtml(scan.project)}</span>${reason}</li>`;
+  };
+
+  const supported = scan.resources.filter((r) => r.supported);
+  const groupedRows = CATEGORY_ORDER.map((category) => {
+    const entries = supported.filter((r) => (r.group ?? "other") === category);
+    if (entries.length === 0) {
+      return "";
+    }
+    const deployedCount = entries.filter((r) => r.deployed).length;
+    return `<h3>${escapeHtml(CATEGORY_LABEL[category])} <span class="dim">(${deployedCount}/${entries.length})</span></h3><ul class="gcpScanList">${entries.map(renderRow).join("")}</ul>`;
+  }).join("");
   const unsupportedRows = scan.resources
     .filter((r) => !r.supported)
     .map((r) => `<li class="dim">⚪ ${escapeHtml(r.type)}.${escapeHtml(r.name)} -- not yet checkable</li>`)
@@ -130,7 +139,7 @@ function buildGcpScanHtml(scan: GcpScan | undefined): string {
       <tr><td class="label">Deployed</td><td>${scan.deployed_count}/${scan.checked_count} checked resources</td></tr>
       <tr><td class="label">Last Scanned</td><td>${escapeHtml(scannedAt)}</td></tr>
     </table>
-    <ul class="gcpScanList">${rows}</ul>
+    ${groupedRows}
     ${unsupportedRows ? `<details><summary class="dim">${scan.unsupported_count} unsupported resource type(s)</summary><ul class="gcpScanList">${unsupportedRows}</ul></details>` : ""}
     <div class="actions"><button id="scanGcpBtn" data-has-scan="true">🔄 Rescan GCP Deployment</button></div>
   `;
