@@ -5,13 +5,54 @@ import { runFrameworkJson, runInteractiveShell, shellQuote } from "./framework";
 import { renderMarkdownSafe } from "./repoReportPanel";
 import { WEBVIEW_BASE_STYLES } from "./webviewChrome";
 
-/** From __mt_radar_iam_analyze_repo (.bash.d/20-vcs/60-iam-advisor.sh) -- an AI-generated analysis of a repo's Terraform, cached in .vcs_iam.json. "error" means the AI query itself failed (provider/key misconfiguration, rate limit, ...), distinct from "no-terraform" (nothing to analyze) and "not-analyzed" (never run yet, synthesized client-side by __mt_radar_iam_show when the cache has no entry). */
+type RoleVerdict = "required" | "excessive" | "not-needed";
+
+/** A role an existing service account holds, as judged against the recommendation (.bash.d/20-vcs/60-iam-advisor.sh). */
+interface IamRoleAssessment {
+  role: string;
+  verdict?: RoleVerdict | string;
+  reason?: string;
+}
+
+/** An existing service account found in the scanned project's IAM policy and the roles it holds there. */
+interface IamCurrentAccount {
+  email: string;
+  roles: IamRoleAssessment[];
+}
+
+interface IamRecommendedRole {
+  role: string;
+  reason?: string;
+}
+
+/** A service account the codebase needs. "replaces" is the email of an existing account from the current configuration that plays the same role, null for a brand-new account. */
+interface IamRecommendedAccount {
+  name: string;
+  purpose?: string;
+  replaces?: string | null;
+  roles: IamRecommendedRole[];
+}
+
+/** From __mt_radar_iam_analyze_repo, cached in .vcs_iam.json. "error" carries a "message" (AI failure, or the project's IAM policy couldn't be read); "no-terraform" means nothing to analyze; "not-analyzed" is synthesized by __mt_radar_iam_show when the cache has no entry. "recommended" is null (with "analysis" holding the raw text) for a reply that wasn't a structured report, and for entries cached before the structured format existed. "current" is null when no GCP project was scanned. */
 interface IamOverview {
   status: "ok" | "not-analyzed" | "no-terraform" | "error";
   analyzed_at: number | null;
   provider: string | null;
-  analysis: string | null;
+  gcp_project?: string | null;
+  recommended?: IamRecommendedAccount[] | null;
+  current?: IamCurrentAccount[] | null;
+  analysis?: string | null;
+  message?: string | null;
 }
+
+/** Colour is never the only signal -- every verdict also carries an icon and a text label. Ordered most-actionable first, which is also the order roles are listed in. */
+const VERDICT_ORDER = ["not-needed", "excessive", "required"] as const;
+const VERDICT_STYLE: Record<(typeof VERDICT_ORDER)[number], { icon: string; label: string; color: string }> = {
+  "not-needed": { icon: "❌", label: "Not needed", color: "var(--vscode-charts-red)" },
+  excessive: { icon: "⚠️", label: "Excessive", color: "var(--vscode-charts-yellow)" },
+  required: { icon: "✅", label: "Required", color: "var(--vscode-charts-green)" },
+};
+const UNKNOWN_VERDICT_STYLE = { icon: "❔", label: "Review", color: "var(--vscode-descriptionForeground)" };
 
 function escapeHtml(value: string): string {
   return value
@@ -22,35 +63,118 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function buildEmptyStateHtml(repoName: string, status: IamOverview["status"]): string {
-  if (status === "no-terraform") {
+function verdictRank(verdict: string | undefined): number {
+  const index = VERDICT_ORDER.indexOf(verdict as (typeof VERDICT_ORDER)[number]);
+  return index === -1 ? VERDICT_ORDER.length : index;
+}
+
+function verdictStyle(verdict: string | undefined): { icon: string; label: string; color: string } {
+  return VERDICT_STYLE[verdict as (typeof VERDICT_ORDER)[number]] ?? UNKNOWN_VERDICT_STYLE;
+}
+
+function buildEmptyStateHtml(repoName: string, iam: IamOverview): string {
+  if (iam.status === "no-terraform") {
     return /* html */ `<p>No Terraform was found in <strong>${escapeHtml(repoName)}</strong> -- this feature only covers repos that deploy infrastructure via Terraform.</p>`;
   }
-  if (status === "error") {
+  if (iam.status === "error") {
     return /* html */ `
-      <p>The last IAM analysis attempt for <strong>${escapeHtml(repoName)}</strong> failed -- check your AI provider configuration (<code>mt-ai-quota</code>) and try again.</p>
+      <p>The last IAM analysis attempt for <strong>${escapeHtml(repoName)}</strong> failed.</p>
+      <p class="dim">${escapeHtml(iam.message ?? "Check your AI provider configuration (mt-ai-quota) and try again.")}</p>
       <button id="generateBtn">🔑 Retry IAM Analysis</button>
     `;
   }
   return /* html */ `
     <p><strong>${escapeHtml(repoName)}</strong> hasn't had an IAM analysis generated yet.</p>
-    <p class="dim">Calls the configured AI provider (real cost/latency) to recommend GCP service accounts and least-privilege roles for this repo's Terraform.</p>
+    <p class="dim">Calls the configured AI provider (real cost/latency) to recommend GCP service accounts and least-privilege roles for this repo's Terraform, and -- given a GCP project -- compares them against the roles its service accounts hold today.</p>
     <button id="generateBtn">🔑 Generate IAM Analysis</button>
   `;
 }
 
+function buildRoleCountsHtml(roles: IamRoleAssessment[]): string {
+  const counts = VERDICT_ORDER.map((verdict) => ({ verdict, count: roles.filter((r) => r.verdict === verdict).length })).filter((c) => c.count > 0);
+  return counts.map((c) => `${VERDICT_STYLE[c.verdict].icon} ${c.count} ${VERDICT_STYLE[c.verdict].label.toLowerCase()}`).join(" · ");
+}
+
+function buildCurrentAccountHtml(account: IamCurrentAccount): string {
+  const roles = [...(account.roles ?? [])].sort((a, b) => verdictRank(a.verdict) - verdictRank(b.verdict));
+  const rows = roles
+    .map((r) => {
+      const style = verdictStyle(r.verdict);
+      return `<div class="roleRow">
+        <span class="badge" style="border-color: ${style.color};">${style.icon} ${escapeHtml(style.label)}</span>
+        <div><code>${escapeHtml(r.role)}</code>${r.reason ? `<div class="dim">${escapeHtml(r.reason)}</div>` : ""}</div>
+      </div>`;
+    })
+    .join("");
+  return /* html */ `
+    <details class="saCard" open>
+      <summary><code>${escapeHtml(account.email)}</code> <span class="dim">${buildRoleCountsHtml(roles)}</span></summary>
+      ${rows || '<p class="dim">No roles granted.</p>'}
+    </details>
+  `;
+}
+
+function buildCurrentSectionHtml(iam: IamOverview): string {
+  const heading = "<h2>Current IAM Configuration</h2>";
+  if (!iam.gcp_project) {
+    return /* html */ `${heading}<p class="dim">Not scanned. Click Regenerate and enter a GCP project to compare this repo's recommendation against the roles its service accounts hold today.</p>`;
+  }
+  const accounts = iam.current ?? [];
+  const intro = `<p class="dim">Service accounts in <code>${escapeHtml(iam.gcp_project)}</code> that this codebase appears to use, with the roles each holds there.</p>`;
+  if (accounts.length === 0) {
+    return /* html */ `${heading}${intro}<p class="dim">No existing service accounts in this project matched this codebase.</p>`;
+  }
+  return /* html */ `${heading}${intro}${accounts.map(buildCurrentAccountHtml).join("")}`;
+}
+
+function buildRecommendedAccountHtml(account: IamRecommendedAccount): string {
+  const replaces = account.replaces
+    ? `Replaces <code>${escapeHtml(account.replaces)}</code>`
+    : "New account -- replaces nothing that exists today";
+  const rows = (account.roles ?? [])
+    .map(
+      (r) => `<div class="roleRow plain">
+        <div><code>${escapeHtml(r.role)}</code>${r.reason ? `<div class="dim">${escapeHtml(r.reason)}</div>` : ""}</div>
+      </div>`,
+    )
+    .join("");
+  return /* html */ `
+    <details class="saCard" open>
+      <summary><code>${escapeHtml(account.name)}</code> <span class="dim">${(account.roles ?? []).length} role${(account.roles ?? []).length === 1 ? "" : "s"}</span></summary>
+      ${account.purpose ? `<p class="saPurpose">${escapeHtml(account.purpose)}</p>` : ""}
+      <p class="dim saMeta">${replaces}</p>
+      ${rows || '<p class="dim">No roles required.</p>'}
+    </details>
+  `;
+}
+
+function buildRecommendedSectionHtml(accounts: IamRecommendedAccount[]): string {
+  const heading = "<h2>Recommended IAM Configuration</h2>";
+  if (accounts.length === 0) {
+    return /* html */ `${heading}<p class="dim">No IAM requirements were identified for this codebase.</p>`;
+  }
+  return /* html */ `${heading}${accounts.map(buildRecommendedAccountHtml).join("")}`;
+}
+
 async function buildOverviewHtml(iam: IamOverview): Promise<string> {
   const analyzedAt = iam.analyzed_at ? new Date(iam.analyzed_at * 1000).toLocaleString() : "Unknown";
-  const analysisHtml = iam.analysis ? await renderMarkdownSafe(iam.analysis) : "<p class='dim'>No analysis text returned.</p>";
-
-  return /* html */ `
+  const summary = /* html */ `
     <table>
       <tr><td class="label">AI Provider</td><td>${escapeHtml(iam.provider ?? "Unknown")}</td></tr>
+      <tr><td class="label">GCP Project</td><td>${iam.gcp_project ? escapeHtml(iam.gcp_project) : '<span class="dim">Not scanned</span>'}</td></tr>
       <tr><td class="label">Last Analyzed</td><td>${escapeHtml(analyzedAt)}</td></tr>
     </table>
     <div class="actions"><button id="regenerateBtn">🔄 Regenerate</button></div>
-    <div class="analysis">${analysisHtml}</div>
   `;
+
+  if (!Array.isArray(iam.recommended)) {
+    const legacy = iam.analysis ? await renderMarkdownSafe(iam.analysis) : "<p class='dim'>No analysis text returned.</p>";
+    return /* html */ `${summary}
+      <p class="dim">This result isn't in the structured format (older analysis, or the model didn't return a report) -- showing the raw text. Regenerate for the current-versus-recommended view.</p>
+      <div class="analysis">${legacy}</div>`;
+  }
+
+  return /* html */ `${summary}${buildCurrentSectionHtml(iam)}${buildRecommendedSectionHtml(iam.recommended)}`;
 }
 
 function buildHtml(repoName: string, bodyHtml: string, nonce: string): string {
@@ -61,9 +185,19 @@ function buildHtml(repoName: string, bodyHtml: string, nonce: string): string {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
   ${WEBVIEW_BASE_STYLES}
+  h2 { margin-top: 32px; }
   .analysis { border-top: 1px solid var(--vscode-panel-border); padding-top: 12px; max-width: 900px; }
   .analysis code { background: var(--vscode-textCodeBlock-background); padding: 1px 5px; border-radius: 3px; }
   .analysis pre { background: var(--vscode-textCodeBlock-background); padding: 10px; overflow-x: auto; }
+  code { background: var(--vscode-textCodeBlock-background); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+  .saCard { border: 1px solid var(--vscode-panel-border); border-radius: 4px; padding: 8px 14px; margin: 10px 0; max-width: 900px; }
+  .saCard > summary { cursor: pointer; padding: 2px 0; overflow-wrap: anywhere; }
+  .saPurpose { margin: 10px 0 4px; }
+  .saMeta { margin: 4px 0 8px; }
+  .roleRow { display: grid; grid-template-columns: 120px 1fr; gap: 12px; padding: 6px 0; border-top: 1px solid var(--vscode-panel-border); }
+  .roleRow.plain { grid-template-columns: 1fr; }
+  .roleRow .dim { margin-top: 2px; font-size: 0.92em; }
+  .badge { border: 1px solid; border-radius: 10px; padding: 1px 8px; font-size: 0.85em; white-space: nowrap; align-self: start; justify-self: start; }
 </style>
 </head>
 <body>
@@ -124,23 +258,34 @@ async function fetchIam(repoPath: string): Promise<IamOverview> {
  * own progress text doesn't have to be JSON, then a separate --json read
  * back) as infraOverviewPanel.ts/generateAndFetch and
  * scanGcpAndFetch use for their own on-demand, AI/API-backed actions.
+ * A non-empty gcpProject also makes the framework read that project's live
+ * service-account role grants, for the "current" section.
  */
-async function generateAndFetch(repoPath: string): Promise<IamOverview> {
-  await runInteractiveShell(`mt-radar --iam -r ${shellQuote(path.basename(repoPath))}`);
+async function generateAndFetch(repoPath: string, gcpProject: string): Promise<IamOverview> {
+  const projectFlag = gcpProject ? ` --gcp-project ${shellQuote(gcpProject)}` : "";
+  await runInteractiveShell(`mt-radar --iam -r ${shellQuote(path.basename(repoPath))}${projectFlag}`);
   return fetchIam(repoPath);
 }
 
 async function renderBody(iam: IamOverview, repoName: string): Promise<string> {
-  return iam.status === "ok" ? buildOverviewHtml(iam) : buildEmptyStateHtml(repoName, iam.status);
+  return iam.status === "ok" ? buildOverviewHtml(iam) : buildEmptyStateHtml(repoName, iam);
+}
+
+async function postBody(iam: IamOverview): Promise<void> {
+  const html = await renderBody(iam, path.basename(displayedRepoPath));
+  activePanel?.webview.postMessage({ command: "updateBody", html });
 }
 
 /**
- * Shows the AI-generated GCP IAM recommendations (service accounts +
- * least-privilege roles) for one repo's Terraform -- generating it on
- * first view if it hasn't been already. Unlike showInfraOverview, this
- * always calls the configured AI provider (real cost/latency), so nothing
- * here runs automatically; the panel only ever reads the cache until the
- * user clicks Generate/Regenerate.
+ * Shows the AI-generated GCP IAM analysis for one repo's Terraform:
+ * a "Current IAM Configuration" section (the roles its service accounts
+ * hold today in a chosen GCP project, each labeled required / excessive /
+ * not needed) and a "Recommended IAM Configuration" section (each service
+ * account the codebase needs, its purpose, the existing account it
+ * replaces, and its required roles). Unlike showInfraOverview, this always
+ * calls the configured AI provider (real cost/latency), so nothing here
+ * runs automatically; the panel only ever reads the cache until the user
+ * clicks Generate/Regenerate.
  */
 export async function showIamAdvisor(repoPath: string): Promise<void> {
   const repoName = path.basename(repoPath);
@@ -168,9 +313,19 @@ export async function showIamAdvisor(repoPath: string): Promise<void> {
     activePanel.webview.onDidReceiveMessage(async (message: { command: string }) => {
       if (message.command !== "generate") return;
       try {
-        const result = await generateAndFetch(displayedRepoPath);
-        const html = await renderBody(result, path.basename(displayedRepoPath));
-        activePanel?.webview.postMessage({ command: "updateBody", html });
+        const previous = await fetchIam(displayedRepoPath);
+        const gcpProject = await vscode.window.showInputBox({
+          title: "IAM analysis",
+          prompt: "GCP project to read current IAM from (leave blank to skip the current-configuration comparison)",
+          value: previous.gcp_project ?? "",
+          placeHolder: "e.g. stage-cloud-connect",
+        });
+        if (gcpProject === undefined) {
+          // Cancelled -- re-render the unchanged body so the button re-enables.
+          await postBody(previous);
+          return;
+        }
+        await postBody(await generateAndFetch(displayedRepoPath, gcpProject.trim()));
       } catch (err) {
         activePanel?.webview.postMessage({
           command: "generateFailed",
