@@ -3,6 +3,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import { runFrameworkJson, runInteractiveShell, shellQuote } from "./framework";
 import { renderMarkdownSafe } from "./repoReportPanel";
+import { WEBVIEW_BASE_STYLES } from "./webviewChrome";
 
 /** From __mt_radar_iam_analyze_repo (.bash.d/20-vcs/60-iam-advisor.sh) -- an AI-generated analysis of a repo's Terraform, cached in .vcs_iam.json. "error" means the AI query itself failed (provider/key misconfiguration, rate limit, ...), distinct from "no-terraform" (nothing to analyze) and "not-analyzed" (never run yet, synthesized client-side by __mt_radar_iam_show when the cache has no entry). */
 interface IamOverview {
@@ -59,23 +60,10 @@ function buildHtml(repoName: string, bodyHtml: string, nonce: string): string {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
-  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 0 24px 24px; }
-  h1 { font-size: 1.4em; }
-  table { border-collapse: collapse; margin: 12px 0; }
-  td { padding: 4px 12px 4px 0; vertical-align: top; }
-  td.label { color: var(--vscode-descriptionForeground); white-space: nowrap; }
-  .dim { color: var(--vscode-descriptionForeground); }
-  .actions { margin: 16px 0; }
+  ${WEBVIEW_BASE_STYLES}
   .analysis { border-top: 1px solid var(--vscode-panel-border); padding-top: 12px; max-width: 900px; }
   .analysis code { background: var(--vscode-textCodeBlock-background); padding: 1px 5px; border-radius: 3px; }
   .analysis pre { background: var(--vscode-textCodeBlock-background); padding: 10px; overflow-x: auto; }
-  button {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border: none; padding: 6px 14px; border-radius: 2px; cursor: pointer; font-size: 0.95em;
-  }
-  button:hover { background: var(--vscode-button-hoverBackground); }
-  button:disabled { opacity: 0.6; cursor: default; }
 </style>
 </head>
 <body>
