@@ -9,6 +9,7 @@ import { showIamAdvisor } from "./iamAdvisorPanel";
 import { showInfraOverview } from "./infraOverviewPanel";
 import { getIndexModifierFlags } from "./repoRadarProvider";
 import type { RepoMeta } from "./repoRadarProvider";
+import { WEBVIEW_BASE_STYLES } from "./webviewChrome";
 
 /** Same badge-style palette as other status-coded pills elsewhere in this webview, keyed by mt-radar's AI-inferred environment "type" vocabulary. */
 const ENV_TYPE_COLOR: Record<string, string> = {
@@ -604,32 +605,27 @@ function buildHtml(repoPath: string, meta: RepoMeta, data: ReportData, nonce: st
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
-  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 0 24px 24px; }
-  h1 { font-size: 1.4em; word-break: break-all; }
+  ${WEBVIEW_BASE_STYLES}
+  h1 { word-break: break-all; }
   .path, .remote { color: var(--vscode-descriptionForeground); font-size: 0.9em; word-break: break-all; cursor: pointer; }
   .path { margin-top: -8px; }
   .path:hover, .remote:hover { text-decoration: underline; color: var(--vscode-textLink-foreground); }
   .pagination { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
   .description { font-size: 1.05em; margin: 16px 0; }
-  table { border-collapse: collapse; margin: 12px 0; }
-  td { padding: 4px 12px 4px 0; vertical-align: top; }
-  td.label { color: var(--vscode-descriptionForeground); white-space: nowrap; }
-  h2 { font-size: 1em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--vscode-descriptionForeground); margin-top: 28px; }
+  h2 { margin-top: 28px; }
   ul { padding-left: 18px; }
   li { margin: 4px 0; }
   code { background: var(--vscode-textCodeBlock-background); padding: 1px 5px; border-radius: 3px; }
   a { color: var(--vscode-textLink-foreground); }
-  .dim { color: var(--vscode-descriptionForeground); }
-  .actions { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
   .readme { border-top: 1px solid var(--vscode-panel-border); padding-top: 12px; max-width: 900px; }
   .readme img { max-width: 100%; }
   .readme pre { background: var(--vscode-textCodeBlock-background); padding: 10px; overflow-x: auto; }
-  button, .fetchBtn {
+  .fetchBtn {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border: none; padding: 6px 14px; border-radius: 2px; cursor: pointer; font-size: 0.95em;
   }
-  button:hover, .fetchBtn:hover { background: var(--vscode-button-hoverBackground); }
+  .fetchBtn:hover { background: var(--vscode-button-hoverBackground); }
   #openBtn { margin-top: 0; }
   .environments { display: flex; flex-wrap: wrap; gap: 8px; }
   .envPill { border: 1px solid; border-radius: 12px; padding: 3px 10px; font-size: 0.9em; }

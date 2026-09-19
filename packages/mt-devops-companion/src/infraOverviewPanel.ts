@@ -2,6 +2,7 @@ import * as crypto from "node:crypto";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { runFrameworkJson, runInteractiveShell, shellQuote } from "./framework";
+import { WEBVIEW_BASE_STYLES } from "./webviewChrome";
 
 interface InfraResourceEntry {
   type: string;
@@ -171,26 +172,12 @@ function buildHtml(repoName: string, bodyHtml: string, nonce: string): string {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
-  body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 0 24px 24px; }
-  h1 { font-size: 1.4em; }
-  h2 { font-size: 1em; text-transform: uppercase; letter-spacing: 0.05em; color: var(--vscode-descriptionForeground); margin-top: 24px; }
-  table { border-collapse: collapse; margin: 12px 0; }
-  td { padding: 4px 12px 4px 0; vertical-align: top; }
-  td.label { color: var(--vscode-descriptionForeground); white-space: nowrap; }
+  ${WEBVIEW_BASE_STYLES}
   .resources { display: flex; flex-wrap: wrap; gap: 8px; }
   .resPill { border: 1px solid; border-radius: 12px; padding: 3px 10px; font-size: 0.9em; }
-  .dim { color: var(--vscode-descriptionForeground); }
-  .actions { margin: 16px 0; }
   .gcpScanList { list-style: none; padding: 0; margin: 8px 0; }
   .gcpScanList li { padding: 3px 0; }
   details summary { cursor: pointer; margin: 8px 0; }
-  button {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border: none; padding: 6px 14px; border-radius: 2px; cursor: pointer; font-size: 0.95em;
-  }
-  button:hover { background: var(--vscode-button-hoverBackground); }
-  button:disabled { opacity: 0.6; cursor: default; }
 </style>
 </head>
 <body>
