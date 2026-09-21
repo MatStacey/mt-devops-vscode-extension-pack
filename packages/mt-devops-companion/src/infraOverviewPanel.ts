@@ -2,6 +2,7 @@ import * as crypto from "node:crypto";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { runFrameworkJson, runInteractiveShell, shellQuote } from "./framework";
+import { pickGcpProject } from "./gcpProjectPicker";
 import { WEBVIEW_BASE_STYLES } from "./webviewChrome";
 
 interface InfraResourceEntry {
@@ -331,9 +332,11 @@ export async function showInfraOverview(repoPath: string): Promise<void> {
 
       if (message.command === "scanGcp") {
         try {
-          const gcpProject = await vscode.window.showInputBox({
-            prompt: "GCP project to scan against (leave blank for gcloud's active project)",
-            placeHolder: "e.g. my-project-dev",
+          const gcpProject = await pickGcpProject(displayedRepoPath, {
+            title: "Scan GCP deployment",
+            noProjectLabel: "Use gcloud's active project",
+            noProjectDetail: "Scan against whichever project `gcloud config` currently points at",
+            previous: (await fetchInfra(displayedRepoPath)).gcp_scan?.project,
           });
           if (gcpProject === undefined) {
             // User cancelled the prompt -- just re-render the unchanged body so the button re-enables.

@@ -2,6 +2,7 @@ import * as crypto from "node:crypto";
 import * as path from "node:path";
 import * as vscode from "vscode";
 import { runFrameworkJson, runInteractiveShell, shellQuote } from "./framework";
+import { pickGcpProject } from "./gcpProjectPicker";
 import { renderMarkdownSafe } from "./repoReportPanel";
 import { WEBVIEW_BASE_STYLES } from "./webviewChrome";
 
@@ -314,11 +315,11 @@ export async function showIamAdvisor(repoPath: string): Promise<void> {
       if (message.command !== "generate") return;
       try {
         const previous = await fetchIam(displayedRepoPath);
-        const gcpProject = await vscode.window.showInputBox({
-          title: "IAM analysis",
-          prompt: "GCP project to read current IAM from (leave blank to skip the current-configuration comparison)",
-          value: previous.gcp_project ?? "",
-          placeHolder: "e.g. stage-cloud-connect",
+        const gcpProject = await pickGcpProject(displayedRepoPath, {
+          title: "IAM analysis -- project to read current IAM from",
+          noProjectLabel: "Skip the current-configuration comparison",
+          noProjectDetail: "Only recommend IAM for the Terraform; don't read any project's live IAM",
+          previous: previous.gcp_project,
         });
         if (gcpProject === undefined) {
           // Cancelled -- re-render the unchanged body so the button re-enables.
