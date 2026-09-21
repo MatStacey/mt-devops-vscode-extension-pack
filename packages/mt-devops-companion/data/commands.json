@@ -666,6 +666,12 @@
     "category": "Configuration Management"
   },
   {
+    "id": "mtDevops.catalog.mt_wizard_gcp",
+    "command": "mt-wizard-gcp",
+    "description": "Config: Interactive GCP Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
     "id": "mtDevops.catalog.mt_wizard_git",
     "command": "mt-wizard-git",
     "description": "Config: Interactive Git Setup Menu",
@@ -783,6 +789,12 @@
     "id": "mtDevops.catalog.docker_group_stop",
     "command": "docker-group-stop",
     "description": "Docker: Stop every container in a single Compose project in place --",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_health",
+    "command": "docker-health",
+    "description": "Docker: Diagnose an unhealthy container -- its health status and failing",
     "category": "Docker: Container Management Utilities"
   },
   {
