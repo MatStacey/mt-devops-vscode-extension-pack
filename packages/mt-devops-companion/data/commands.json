@@ -32,7 +32,7 @@
   {
     "id": "mtDevops.catalog.ruff_fmt",
     "command": "ruff-fmt",
-    "description": "Dev: Python - Format Python files and imports using Ruff (recursive)",
+    "description": "Dev: Python - Format Python files and imports using Ruff (recursive, rewrites files; see ruff-check)",
     "category": "Development & Build Tools"
   },
   {
@@ -666,6 +666,12 @@
     "category": "Configuration Management"
   },
   {
+    "id": "mtDevops.catalog.mt_wizard_gcp",
+    "command": "mt-wizard-gcp",
+    "description": "Config: Interactive GCP Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
     "id": "mtDevops.catalog.mt_wizard_git",
     "command": "mt-wizard-git",
     "description": "Config: Interactive Git Setup Menu",
@@ -786,6 +792,12 @@
     "category": "Docker: Container Management Utilities"
   },
   {
+    "id": "mtDevops.catalog.docker_health",
+    "command": "docker-health",
+    "description": "Docker: Diagnose an unhealthy container -- its health status and failing",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
     "id": "mtDevops.catalog.docker_ls",
     "command": "docker-ls",
     "description": "Docker: List containers in a clean table format",
@@ -880,6 +892,12 @@
     "command": "mt-blueprint",
     "description": "Framework: Scaffold a new repository using standardized DevOps blueprints",
     "category": "Framework: Repository Scaffolding from Blueprints"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_auth_check",
+    "command": "gcl-auth-check",
+    "description": "GCP: Check whether the active gcloud account has a usable token. Unlike",
+    "category": "GCP: Configuration & Authentication"
   },
   {
     "id": "mtDevops.catalog.gcl_config",
@@ -1008,6 +1026,30 @@
     "category": "GCP: Read-Only Cross-Project Reconnaissance"
   },
   {
+    "id": "mtDevops.catalog.gcl_bq_query",
+    "command": "gcl-bq-query",
+    "description": "GCP: Run a read-only BigQuery query. Only a single SELECT/WITH statement",
+    "category": "GCP: Read-Only Inspection Wrappers"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_gcs_summary",
+    "command": "gcl-gcs-summary",
+    "description": "GCP: Summarise a GCS location -- one line per immediate prefix with its",
+    "category": "GCP: Read-Only Inspection Wrappers"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_run_log_summary",
+    "command": "gcl-run-log-summary",
+    "description": "GCP: Count Cloud Run log lines by message template. Numbers, IDs, UUIDs,",
+    "category": "GCP: Read-Only Inspection Wrappers"
+  },
+  {
+    "id": "mtDevops.catalog.gcl_wif_describe",
+    "command": "gcl-wif-describe",
+    "description": "GCP: Describe a Workload Identity Pool and list its providers. Read-only.",
+    "category": "GCP: Read-Only Inspection Wrappers"
+  },
+  {
     "id": "mtDevops.catalog.bq_query",
     "command": "bq-query",
     "description": "GCP: Run standard SQL query in BigQuery",
@@ -1098,6 +1140,12 @@
     "category": "Google Style Code Formatting"
   },
   {
+    "id": "mtDevops.catalog.ruff_check",
+    "command": "ruff-check",
+    "description": "Dev: Python - Lint and format-check with Ruff without modifying any file.",
+    "category": "Google Style Code Formatting"
+  },
+  {
     "id": "mtDevops.catalog.helm_install",
     "command": "helm-install",
     "description": "Helm: Install a chart as a new release in the current namespace",
@@ -1156,6 +1204,12 @@
     "command": "tf-val-all",
     "description": "Terraform: Recursively validate and scan all Terraform directories",
     "category": "Infrastructure as Code"
+  },
+  {
+    "id": "mtDevops.catalog.mt_conftest",
+    "command": "mt-conftest",
+    "description": "Conftest: Test files against OPA/Rego policies, or run the policies'",
+    "category": "Infrastructure: Conftest (OPA Policy Testing)"
   },
   {
     "id": "mtDevops.catalog.mt_copy",
@@ -1404,6 +1458,12 @@
     "category": "Private Aliases (local-only -- never synced to the framework repo)"
   },
   {
+    "id": "mtDevops.catalog.uv_pytest",
+    "command": "uv-pytest",
+    "description": "Dev: Python - Run a uv project's pytest suite with coverage from the",
+    "category": "Python Development Helpers"
+  },
+  {
     "id": "mtDevops.catalog.mt_add_bitbucket_secret",
     "command": "mt-add-bitbucket-secret",
     "description": "System: Interactively add or update your Bitbucket API token, paired",
@@ -1413,6 +1473,12 @@
     "id": "mtDevops.catalog.mt_add_claude_key",
     "command": "mt-add-claude-key",
     "description": "AI: Interactively add or update your Claude API key",
+    "category": "Secrets Management"
+  },
+  {
+    "id": "mtDevops.catalog.mt_add_confluence_secret",
+    "command": "mt-add-confluence-secret",
+    "description": "System: Interactively add or update your Confluence Cloud credentials: the",
     "category": "Secrets Management"
   },
   {
@@ -1536,6 +1602,12 @@
     "category": "Terraform & Kubernetes Wrappers"
   },
   {
+    "id": "mtDevops.catalog.mt_http",
+    "command": "mt-http",
+    "description": "HTTP: Make an authenticated HTTP request with curl. Credentials are passed",
+    "category": "Utilities: Authenticated HTTP Client"
+  },
+  {
     "id": "mtDevops.catalog.mt_jobs",
     "command": "mt-jobs",
     "description": "System: List and manage MT background jobs",
@@ -1566,6 +1638,18 @@
     "category": "Utilities: Centralized Framework Logging"
   },
   {
+    "id": "mtDevops.catalog.mt_test_all",
+    "command": "mt-test-all",
+    "description": "Testing: Run the framework's full test suite -- bats (tests/bash/)",
+    "category": "Utilities: Framework Test Runner"
+  },
+  {
+    "id": "mtDevops.catalog.mt_html_check",
+    "command": "mt-html-check",
+    "description": "HTML: Validate a local HTML file for unbalanced tags and broken",
+    "category": "Utilities: HTML Structure Checker"
+  },
+  {
     "id": "mtDevops.catalog.mt_http_server",
     "command": "mt-http-server",
     "description": "System: Host the current directory over a temporary HTTP server. Only",
@@ -1582,6 +1666,48 @@
     "command": "mt-server-manager",
     "description": "Utilities: Interactive menu to manage the single mt-http-server",
     "category": "Utilities: Temporary HTTP File Server"
+  },
+  {
+    "id": "mtDevops.catalog.bb_pr",
+    "command": "bb-pr",
+    "description": "Bitbucket: Show a pull request's metadata, diff, diffstat or comments",
+    "category": "Version Control: Bitbucket Cloud API Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.bb_env",
+    "command": "bb-env",
+    "description": "Bitbucket: List or create deployment environments",
+    "category": "Version Control: Bitbucket Pipelines, Environments and Variables"
+  },
+  {
+    "id": "mtDevops.catalog.bb_pipelines",
+    "command": "bb-pipelines",
+    "description": "Bitbucket: List recent pipeline runs, show a run's steps, or print a",
+    "category": "Version Control: Bitbucket Pipelines, Environments and Variables"
+  },
+  {
+    "id": "mtDevops.catalog.bb_var",
+    "command": "bb-var",
+    "description": "Bitbucket: List or add pipeline variables, repository-wide or per environment.",
+    "category": "Version Control: Bitbucket Pipelines, Environments and Variables"
+  },
+  {
+    "id": "mtDevops.catalog.conf_folder",
+    "command": "conf-folder",
+    "description": "Confluence: List a folder's direct children (pages, folders, ...)",
+    "category": "Version Control: Confluence Cloud Read Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.conf_get",
+    "command": "conf-get",
+    "description": "Confluence: Read a page as plain text (or raw storage-format HTML)",
+    "category": "Version Control: Confluence Cloud Read Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.conf_search",
+    "command": "conf-search",
+    "description": "Confluence: Search with a text term or a raw CQL query",
+    "category": "Version Control: Confluence Cloud Read Helpers"
   },
   {
     "id": "mtDevops.catalog.git_ai_push_all",
@@ -1626,6 +1752,12 @@
     "category": "Version Control (Git) - Core Helpers"
   },
   {
+    "id": "mtDevops.catalog.git_diff_all",
+    "command": "git-diff-all",
+    "description": "Git: Show every uncommitted change (staged, unstaged and untracked files)",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
     "id": "mtDevops.catalog.git_new_feature",
     "command": "git-new-feature",
     "description": "Git: Create and checkout a new feature branch",
@@ -1652,7 +1784,13 @@
   {
     "id": "mtDevops.catalog.git_raise_pr",
     "command": "git-raise-pr",
-    "description": "Git: Push current branch and raise a Pull Request (GitHub/GitLab/Bitbucket)",
+    "description": "Git: Push current branch and raise a Pull Request (GitHub/GitLab/Bitbucket).",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.git_review_prs",
+    "command": "git-review-prs",
+    "description": "Git: List the open pull requests for the current repo, or show the",
     "category": "Version Control (Git) - Core Helpers"
   },
   {
@@ -1671,6 +1809,12 @@
     "id": "mtDevops.catalog.mt_git_clone",
     "command": "mt-git-clone",
     "description": "Git: Clone a repository into a sensibly routed default location",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.mt_grep_repos",
+    "command": "mt-grep-repos",
+    "description": "Git: Search file contents and/or file names across every local repo",
     "category": "Version Control (Git) - Core Helpers"
   },
   {
