@@ -666,6 +666,12 @@
     "category": "Configuration Management"
   },
   {
+    "id": "mtDevops.catalog.mt_wizard_gcp",
+    "command": "mt-wizard-gcp",
+    "description": "Config: Interactive GCP Setup Menu",
+    "category": "Configuration Management"
+  },
+  {
     "id": "mtDevops.catalog.mt_wizard_git",
     "command": "mt-wizard-git",
     "description": "Config: Interactive Git Setup Menu",
@@ -783,6 +789,12 @@
     "id": "mtDevops.catalog.docker_group_stop",
     "command": "docker-group-stop",
     "description": "Docker: Stop every container in a single Compose project in place --",
+    "category": "Docker: Container Management Utilities"
+  },
+  {
+    "id": "mtDevops.catalog.docker_health",
+    "command": "docker-health",
+    "description": "Docker: Diagnose an unhealthy container -- its health status and failing",
     "category": "Docker: Container Management Utilities"
   },
   {
@@ -1156,6 +1168,12 @@
     "command": "tf-val-all",
     "description": "Terraform: Recursively validate and scan all Terraform directories",
     "category": "Infrastructure as Code"
+  },
+  {
+    "id": "mtDevops.catalog.mt_conftest",
+    "command": "mt-conftest",
+    "description": "Conftest: Test files against OPA/Rego policies, or run the policies'",
+    "category": "Infrastructure: Conftest (OPA Policy Testing)"
   },
   {
     "id": "mtDevops.catalog.mt_copy",
@@ -1566,6 +1584,18 @@
     "category": "Utilities: Centralized Framework Logging"
   },
   {
+    "id": "mtDevops.catalog.mt_html_check",
+    "command": "mt-html-check",
+    "description": "HTML: Validate a local HTML file for unbalanced tags and broken",
+    "category": "Utilities: HTML Structure Checker"
+  },
+  {
+    "id": "mtDevops.catalog.mt_test_all",
+    "command": "mt-test-all",
+    "description": "Testing: Run the framework's full test suite -- bats (tests/bash/)",
+    "category": "Utilities: Framework Test Runner"
+  },
+  {
     "id": "mtDevops.catalog.mt_http_server",
     "command": "mt-http-server",
     "description": "System: Host the current directory over a temporary HTTP server. Only",
@@ -1656,6 +1686,12 @@
     "category": "Version Control (Git) - Core Helpers"
   },
   {
+    "id": "mtDevops.catalog.git_review_prs",
+    "command": "git-review-prs",
+    "description": "Git: List the open pull requests for the current repo, or show the",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
     "id": "mtDevops.catalog.git_review_start",
     "command": "git-review-start",
     "description": "Git: Quick orientation for starting a code review -- current branch",
@@ -1671,6 +1707,12 @@
     "id": "mtDevops.catalog.mt_git_clone",
     "command": "mt-git-clone",
     "description": "Git: Clone a repository into a sensibly routed default location",
+    "category": "Version Control (Git) - Core Helpers"
+  },
+  {
+    "id": "mtDevops.catalog.mt_grep_repos",
+    "command": "mt-grep-repos",
+    "description": "Git: Search file contents and/or file names across every local repo",
     "category": "Version Control (Git) - Core Helpers"
   },
   {
